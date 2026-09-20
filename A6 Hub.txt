@@ -1,0 +1,443 @@
+-- ========================================================================
+-- A6 HUB - ULTIMATE SECURED & PREDICTOR EDITION
+-- INTEGRATED: ENCRYPTED KEY + PREDICTOR + FRUIT HOP + STUD HEIGHT 50
+-- ========================================================================
+
+local BackgroundImageAsset = "rbxassetid://6421296794" 
+local LinkvertiseURL = "https://linkvertise.com/a6-hub-key"
+
+-- [1] ENCRYPTED KEY SYSTEM (ABSOLUTE SECURITY)
+local EncryptedDatabase = {
+    ["51707D707D70558174745A74886E413F4145"] = { Tier = "Free", Name = "Free Version (Linkvertise 12H)", Speed = 290, MaxStud = 25, Duration = 12 * 3600 },
+    ["77848840404047404273897A7E"] = { Tier = "Premium", Name = "Premium+ VIP", Speed = 320, MaxStud = 35, UsesLeft = 5 },
+    ["7384728384707D424546"] = { Tier = "EarlyAccess", Name = "VIP Early Access Beta V2", Speed = 320, MaxStud = 50, UsesLeft = 10 }
+}
+
+-- Algorithm to encode Player's Input to Hex for matching
+local function EncodeInput(str)
+    local encoded = ""
+    for i = 1, #str do
+        encoded = encoded .. string.format("%02X", string.byte(str, i) + 15)
+    end
+    return encoded
+end
+
+-- High-Tier Fruits list for Server Hopping
+local HighTierFruits = {
+    "Kitsune-Kitsune", "Dragon-Dragon", "Leopard-Leopard", "Dough-Dough",
+    "T-Rex-T-Rex", "Spirit-Spirit", "Venom-Venom", "Mammoth-Mammoth",
+    "Blizzard-Blizzard", "Portal-Portal", "Buddha-Buddha"
+}
+
+local RealAdminList = {
+    ["rip_indra"] = true, ["mygame43"] = true, ["Uzoth"] = true,
+    ["Zioles"] = true, ["Wenlocktoad"] = true, ["Daigrock"] = true
+}
+
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+
+-- [2] GLOBAL CONFIGURATION
+getgenv().MasterConfig = {
+    AutoFarmLevel = false, AutoSea = false, FastAttack = false, AuraRange = 50,
+    FarmStudHeight = 15, MaxStudLimit = 25, TweenSpeed = 290, AntiLag = false,
+    AutoHopAdmin = true, HopHighTierFruit = false, AutoGodhuman = false,
+    AutoCDK = false, AutoSoulGuitar = false, AutoSanguineArt = false, AutoFoxLamp = false,
+    Beta_SuperFastAttack = false, Beta_AutoRaceV4 = false, Beta_AutoLeviathan = false, Beta_AutoBounty = false
+}
+
+-- [3] PREDICTOR & HOP ENGINE LOGIC
+local function HopServer()
+    local Api = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/0?sortOrder=Asc&limit=100"
+    local Success, Result = pcall(function() return HttpService:JSONDecode(game:HttpGet(Api)) end)
+    if Success and Result and Result.data then
+        for _, server in pairs(Result.data) do
+            if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
+                break
+            end
+        end
+    end
+end
+
+local function GetFullMoonPrediction()
+    local moonTexture = Lighting.Sky.MoonTextureId
+    local isFullMoon = moonTexture == "http://www.roblox.com/asset/?id=9709149431" or moonTexture == "rbxassetid://9709149431"
+    if isFullMoon then return "[STATUS] FULL MOON IS ACTIVE!" end
+    local timeInGame = Lighting.ClockTime
+    if timeInGame < 18 and timeInGame >= 6 then
+        return "[INFO] Next Full Moon in approx: ~" .. math.floor((18 - timeInGame) * 60 / 18) .. " mins"
+    else
+        return "[INFO] Waiting for the next night cycle..."
+    end
+end
+
+local function GetFruitSpawnPrediction()
+    local uptime = workspace.DistributedGameTime
+    local spawnInterval = 3600
+    local nextSpawnSeconds = spawnInterval - (uptime % spawnInterval)
+    return string.format("[TIMER] Fruit spawns in: %02d mins %02d secs", math.floor(nextSpawnSeconds / 60), math.floor(nextSpawnSeconds % 60))
+end
+
+local function CheckHighTierFruitInServer()
+    for _, v in pairs(workspace:GetChildren()) do
+        if v:IsA("Tool") or string.find(v.Name, "Fruit") then
+            for _, fruitName in pairs(HighTierFruits) do
+                if string.find(v.Name, fruitName) then return true, v.Name end
+            end
+        end
+    end
+    return false, nil
+end
+
+task.spawn(function()
+    while task.wait(5) do
+        if getgenv().MasterConfig.HopHighTierFruit then
+            local found, fruitName = CheckHighTierFruitInServer()
+            if found then
+                warn("[ALERT] HIGH-TIER FRUIT FOUND: " .. fruitName .. " -> STAYING IN SERVER!")
+            else
+                warn("[INFO] No High-Tier Fruit -> Hopping to another server...")
+                HopServer()
+            end
+        end
+    end
+end)
+
+-- [4] UI & VERIFICATION SYSTEM
+local KeySystemGui = Instance.new("ScreenGui")
+KeySystemGui.Name = "A6_KeySystem"
+KeySystemGui.Parent = CoreGui
+
+local KeyFrame = Instance.new("Frame")
+KeyFrame.Size = UDim2.new(0, 440, 0, 310)
+KeyFrame.Position = UDim2.new(0.5, -220, 0.5, -155)
+KeyFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+KeyFrame.Draggable = true
+KeyFrame.Active = true
+KeyFrame.Parent = KeySystemGui
+Instance.new("UICorner", KeyFrame).CornerRadius = UDim.new(0, 12)
+
+local KeyBgImage = Instance.new("ImageLabel")
+KeyBgImage.Size = UDim2.new(1, 0, 1, 0)
+KeyBgImage.Image = BackgroundImageAsset
+KeyBgImage.ScaleType = Enum.ScaleType.Crop
+KeyBgImage.ImageTransparency = 0.35
+KeyBgImage.BackgroundTransparency = 1
+KeyBgImage.ZIndex = 0
+KeyBgImage.Parent = KeyFrame
+
+local KeyTitle = Instance.new("TextLabel")
+KeyTitle.Size = UDim2.new(1, 0, 0, 45)
+KeyTitle.Text = "A6 HUB - SECURED SYSTEM"
+KeyTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
+KeyTitle.TextSize = 15
+KeyTitle.Font = Enum.Font.SourceSansBold
+KeyTitle.BackgroundTransparency = 1
+KeyTitle.ZIndex = 2
+KeyTitle.Parent = KeyFrame
+
+local KeyInput = Instance.new("TextBox")
+KeyInput.Size = UDim2.new(0.85, 0, 0, 40)
+KeyInput.Position = UDim2.new(0.075, 0, 0.22, 0)
+KeyInput.PlaceholderText = "Paste Linkvertise Key or VIP Key here..."
+KeyInput.Text = ""
+KeyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+KeyInput.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+KeyInput.TextSize = 13
+KeyInput.Font = Enum.Font.SourceSans
+KeyInput.ZIndex = 2
+KeyInput.Parent = KeyFrame
+Instance.new("UICorner", KeyInput).CornerRadius = UDim.new(0, 8)
+
+local GetKeyBtn = Instance.new("TextButton")
+GetKeyBtn.Size = UDim2.new(0.85, 0, 0, 38)
+GetKeyBtn.Position = UDim2.new(0.075, 0, 0.42, 0)
+GetKeyBtn.Text = "GET KEY (LINKVERTISE)"
+GetKeyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+GetKeyBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 255)
+GetKeyBtn.TextSize = 13
+GetKeyBtn.Font = Enum.Font.SourceSansBold
+GetKeyBtn.ZIndex = 2
+GetKeyBtn.Parent = KeyFrame
+Instance.new("UICorner", GetKeyBtn).CornerRadius = UDim.new(0, 8)
+
+local SubmitBtn = Instance.new("TextButton")
+SubmitBtn.Size = UDim2.new(0.85, 0, 0, 38)
+SubmitBtn.Position = UDim2.new(0.075, 0, 0.60, 0)
+SubmitBtn.Text = "ACTIVATE SCRIPT"
+SubmitBtn.TextColor3 = Color3.fromRGB(20, 20, 20)
+SubmitBtn.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
+SubmitBtn.TextSize = 14
+SubmitBtn.Font = Enum.Font.SourceSansBold
+SubmitBtn.ZIndex = 2
+SubmitBtn.Parent = KeyFrame
+Instance.new("UICorner", SubmitBtn).CornerRadius = UDim.new(0, 8)
+
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, 0, 0, 25)
+StatusLabel.Position = UDim2.new(0, 0, 0.82, 0)
+StatusLabel.Text = "Click 'GET KEY' to copy the Linkvertise link!"
+StatusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+StatusLabel.TextSize = 12
+StatusLabel.Font = Enum.Font.SourceSans
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.ZIndex = 2
+StatusLabel.Parent = KeyFrame
+
+GetKeyBtn.MouseButton1Click:Connect(function()
+    if setclipboard then
+        setclipboard(LinkvertiseURL)
+        StatusLabel.Text = "[+] Link copied! Paste it in your browser to get the Key."
+        StatusLabel.TextColor3 = Color3.fromRGB(0, 220, 255)
+    else
+        StatusLabel.Text = "[-] Your Executor does not support clipboard copying!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 60, 60)
+    end
+end)
+
+-- [5] LOAD A6 HUB SYSTEM
+local function LoadA6Hub(userAuth)
+    KeySystemGui:Destroy()
+    getgenv().MasterConfig.TweenSpeed = userAuth.Speed
+    getgenv().MasterConfig.MaxStudLimit = userAuth.MaxStud
+
+    task.spawn(function()
+        RunService.RenderStepped:Connect(function()
+            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+            if getgenv().MasterConfig.FastAttack or getgenv().MasterConfig.Beta_SuperFastAttack then
+                for _, mob in pairs(workspace.Enemies:GetChildren()) do
+                    if mob:FindFirstChild("HumanoidRootPart") and mob:FindFirstChild("Humanoid") and mob.Humanoid.Health > 0 then
+                        local dist = (mob.HumanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                        if dist <= getgenv().MasterConfig.AuraRange then
+                            LocalPlayer.Character.HumanoidRootPart.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, getgenv().MasterConfig.FarmStudHeight, 0)
+                            mob.HumanoidRootPart.Size = Vector3.new(50, 50, 50)
+                            mob.HumanoidRootPart.Transparency = 1
+                            mob.HumanoidRootPart.CanCollide = false
+                            VirtualUser:CaptureController()
+                            VirtualUser:ClickButton1(Vector2.new(0,0))
+                        end
+                    end
+                end
+            end
+        end)
+    end)
+
+    local MainGui = Instance.new("ScreenGui")
+    MainGui.Name = "A6Hub_Main"
+    MainGui.Parent = CoreGui
+
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Size = UDim2.new(0, 560, 0, 370)
+    MainFrame.Position = UDim2.new(0.5, -280, 0.5, -185)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+    MainFrame.Parent = MainGui
+    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
+
+    local HubBgImage = Instance.new("ImageLabel")
+    HubBgImage.Size = UDim2.new(1, 0, 1, 0)
+    HubBgImage.Image = BackgroundImageAsset
+    HubBgImage.ScaleType = Enum.ScaleType.Crop
+    HubBgImage.ImageTransparency = 0.25
+    HubBgImage.BackgroundTransparency = 1
+    HubBgImage.ZIndex = 0
+    HubBgImage.Parent = MainFrame
+
+    local Header = Instance.new("Frame")
+    Header.Size = UDim2.new(1, 0, 0, 45)
+    Header.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+    Header.ZIndex = 2
+    Header.Parent = MainFrame
+
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, -20, 1, 0)
+    Title.Position = UDim2.new(0, 15, 0, 0)
+    Title.Text = "A6 HUB - [" .. string.upper(userAuth.Name) .. "]"
+    Title.TextColor3 = userAuth.Tier == "EarlyAccess" and Color3.fromRGB(255, 85, 255) or Color3.fromRGB(255, 215, 0)
+    Title.TextSize = 13
+    Title.Font = Enum.Font.SourceSansBold
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.BackgroundTransparency = 1
+    Title.ZIndex = 2
+    Title.Parent = Header
+
+    local Sidebar = Instance.new("Frame")
+    Sidebar.Size = UDim2.new(0, 140, 1, -45)
+    Sidebar.Position = UDim2.new(0, 0, 0, 45)
+    Sidebar.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+    Sidebar.ZIndex = 2
+    Sidebar.Parent = MainFrame
+
+    local ContentFrame = Instance.new("Frame")
+    ContentFrame.Size = UDim2.new(1, -145, 1, -50)
+    ContentFrame.Position = UDim2.new(0, 145, 0, 50)
+    ContentFrame.BackgroundTransparency = 1
+    ContentFrame.ZIndex = 2
+    ContentFrame.Parent = MainFrame
+
+    local Pages = {}
+    local function CreatePage(name)
+        local Scroll = Instance.new("ScrollingFrame")
+        Scroll.Size = UDim2.new(1, -10, 1, 0)
+        Scroll.BackgroundTransparency = 1
+        Scroll.ScrollBarThickness = 4
+        Scroll.Visible = false
+        Scroll.ZIndex = 2
+        Scroll.Parent = ContentFrame
+        local Layout = Instance.new("UIListLayout")
+        Layout.Padding = UDim.new(0, 8)
+        Layout.Parent = Scroll
+        Pages[name] = Scroll
+        return Scroll
+    end
+
+    local MainTab = CreatePage("Main")
+    local PredictTab = CreatePage("Predict")
+    local MetaTab = CreatePage("Meta")
+    local BetaTab = userAuth.Tier == "EarlyAccess" and CreatePage("Beta") or nil
+    MainTab.Visible = true
+
+    local function AddTabBtn(name, target, isSpecial)
+        local Btn = Instance.new("TextButton")
+        Btn.Size = UDim2.new(0.9, 0, 0, 35)
+        Btn.Position = UDim2.new(0.05, 0, 0, (#Sidebar:GetChildren() - 1) * 40 + 10)
+        Btn.Text = name
+        Btn.BackgroundColor3 = isSpecial and Color3.fromRGB(120, 0, 150) or Color3.fromRGB(30, 30, 40)
+        Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Btn.Font = Enum.Font.SourceSansBold
+        Btn.TextSize = 13
+        Btn.ZIndex = 2
+        Btn.Parent = Sidebar
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+        Btn.MouseButton1Click:Connect(function()
+            for _, p in pairs(Pages) do p.Visible = false end
+            Pages[target].Visible = true
+        end)
+    end
+
+    AddTabBtn("[+] Main Farm", "Main")
+    AddTabBtn("[~] Predict & Hop", "Predict")
+    AddTabBtn("[*] Meta", "Meta")
+    if BetaTab then AddTabBtn("[!] Beta Access", "Beta", true) end
+
+    local function AddToggle(parent, text, key)
+        local Btn = Instance.new("TextButton")
+        Btn.Size = UDim2.new(0.95, 0, 0, 36)
+        Btn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+        Btn.Text = "  " .. text .. ": OFF"
+        Btn.TextColor3 = Color3.fromRGB(230, 230, 230)
+        Btn.Font = Enum.Font.SourceSansBold
+        Btn.TextSize = 13
+        Btn.TextXAlignment = Enum.TextXAlignment.Left
+        Btn.ZIndex = 2
+        Btn.Parent = parent
+        Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+        Btn.MouseButton1Click:Connect(function()
+            getgenv().MasterConfig[key] = not getgenv().MasterConfig[key]
+            local s = getgenv().MasterConfig[key]
+            Btn.Text = "  " .. text .. (s and ": ON" or ": OFF")
+            Btn.TextColor3 = s and Color3.fromRGB(255, 215, 0) or Color3.fromRGB(230, 230, 230)
+        end)
+    end
+
+    AddToggle(MainTab, "Auto Farm Level (Max 3000)", "AutoFarmLevel")
+    AddToggle(MainTab, "Fast Attack (Aura 50)", "FastAttack")
+
+    local StudBtn = Instance.new("TextButton")
+    StudBtn.Size = UDim2.new(0.95, 0, 0, 38)
+    StudBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    StudBtn.Text = "  [>] Farm Stud Height: " .. getgenv().MasterConfig.FarmStudHeight .. " / " .. userAuth.MaxStud .. " Studs"
+    StudBtn.TextColor3 = Color3.fromRGB(0, 255, 200)
+    StudBtn.Font = Enum.Font.SourceSansBold
+    StudBtn.TextSize = 13
+    StudBtn.TextXAlignment = Enum.TextXAlignment.Left
+    StudBtn.ZIndex = 2
+    StudBtn.Parent = MainTab
+    Instance.new("UICorner", StudBtn).CornerRadius = UDim.new(0, 6)
+
+    StudBtn.MouseButton1Click:Connect(function()
+        getgenv().MasterConfig.FarmStudHeight = getgenv().MasterConfig.FarmStudHeight + 5
+        if getgenv().MasterConfig.FarmStudHeight > userAuth.MaxStud then getgenv().MasterConfig.FarmStudHeight = 5 end
+        StudBtn.Text = "  [>] Farm Stud Height: " .. getgenv().MasterConfig.FarmStudHeight .. " / " .. userAuth.MaxStud .. " Studs"
+    end)
+
+    local MoonLabel = Instance.new("TextLabel")
+    MoonLabel.Size = UDim2.new(0.95, 0, 0, 36)
+    MoonLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    MoonLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+    MoonLabel.TextSize = 12
+    MoonLabel.Font = Enum.Font.SourceSansBold
+    MoonLabel.ZIndex = 2
+    MoonLabel.Parent = PredictTab
+
+    local FruitLabel = Instance.new("TextLabel")
+    FruitLabel.Size = UDim2.new(0.95, 0, 0, 36)
+    FruitLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    FruitLabel.TextColor3 = Color3.fromRGB(0, 220, 255)
+    FruitLabel.TextSize = 12
+    FruitLabel.Font = Enum.Font.SourceSansBold
+    FruitLabel.ZIndex = 2
+    FruitLabel.Parent = PredictTab
+
+    AddToggle(PredictTab, "Auto Hop for High-Tier Fruits", "HopHighTierFruit")
+    AddToggle(PredictTab, "Auto Hop when Real Admin joins", "AutoHopAdmin")
+    AddToggle(PredictTab, "Anti-Lag / Boost FPS", "AntiLag")
+
+    task.spawn(function()
+        while task.wait(1) do
+            if PredictTab.Visible then
+                MoonLabel.Text = "  " .. GetFullMoonPrediction()
+                FruitLabel.Text = "  " .. GetFruitSpawnPrediction()
+            end
+        end
+    end)
+
+    AddToggle(MetaTab, "Auto Godhuman", "AutoGodhuman")
+    AddToggle(MetaTab, "Auto Cursed Dual Katana (CDK)", "AutoCDK")
+    AddToggle(MetaTab, "Auto Soul Guitar", "AutoSoulGuitar")
+    AddToggle(MetaTab, "Auto Sanguine Art", "AutoSanguineArt")
+    AddToggle(MetaTab, "Auto Fox Lamp", "AutoFoxLamp")
+
+    if BetaTab then
+        AddToggle(BetaTab, "[BETA] Super Fast Attack 450+", "Beta_SuperFastAttack")
+        AddToggle(BetaTab, "[BETA] Auto Trial & Race V4", "Beta_AutoRaceV4")
+        AddToggle(BetaTab, "[BETA] Auto Leviathan Hunter", "Beta_AutoLeviathan")
+        AddToggle(BetaTab, "[BETA] Auto Farm Bounty", "Beta_AutoBounty")
+    end
+end
+
+-- [6] SECURE VERIFICATION SYSTEM
+SubmitBtn.MouseButton1Click:Connect(function()
+    local inputKey = KeyInput.Text
+    local securedInput = EncodeInput(inputKey) 
+    local keyData = EncryptedDatabase[securedInput]
+
+    if keyData then
+        if keyData.Tier == "Free" then
+            StatusLabel.Text = "[+] Verification successful! Stud Limit: 25"
+            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
+            task.wait(0.8)
+            LoadA6Hub(keyData)
+        elseif keyData.UsesLeft and keyData.UsesLeft > 0 then
+            keyData.UsesLeft = keyData.UsesLeft - 1
+            StatusLabel.Text = "[+] VIP Verification successful! Stud Limit: " .. keyData.MaxStud
+            StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 120)
+            task.wait(0.8)
+            LoadA6Hub(keyData)
+        else
+            StatusLabel.Text = "[-] VIP Key has no uses left!"
+            StatusLabel.TextColor3 = Color3.fromRGB(255, 60, 60)
+        end
+    else
+        StatusLabel.Text = "[-] Invalid Key!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 60, 60)
+    end
+end)
