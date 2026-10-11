@@ -1,0 +1,24 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+local function hideHead(character)
+    local head = character:WaitForChild("Head", 10)
+    if not head then
+        warn("Head not found")
+        return
+    end
+
+    head.Transparency = 1
+
+    for _, obj in ipairs(head:GetDescendants()) do
+        if obj:IsA("Decal") or obj:IsA("Texture") then
+            obj.Transparency = 1
+        end
+    end
+end
+
+if player.Character then
+    hideHead(player.Character)
+end
+
+player.CharacterAdded:Connect(hideHead)
