@@ -275,6 +275,13 @@ end
 local solitudeBusy = false
 local function runSolitudePattern(kind)
     if solitudeBusy or not Config.Enabled then return end
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "A6 Pattern",
+            Text = "Running: " .. tostring(kind),
+            Duration = 2,
+        })
+    end)
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChild("Humanoid")
@@ -499,10 +506,15 @@ end
 local function tryUppercutDash()
     if not Config.Enabled or not Config.LethalEnabled then return end
     if Config.TouchMode then return end
-    -- typical TSB: 3-4 M1 then jump during last hits = uppercut
-    if comboState.hits >= 3 and (tick() - comboState.lastJump) < 0.45 then
+    local hasPattern = Config.SolitudeHeart or Config.SolitudeP or Config.SolitudeR
+        or Config.PatternTwinnie or Config.PatternBoomy or Config.PatternLordHeaven
+        or Config.PatternVoid or Config.PatternDoopy
+    -- looser window: 2+ M1 and jump within 0.7s
+    if comboState.hits >= 2 and (tick() - comboState.lastJump) < 0.7 then
         executeLethal()
-        task.defer(solitudeAfterUppercut)
+        if hasPattern then
+            task.delay(0.05, solitudeAfterUppercut)
+        end
         comboState.hits = 0
         comboState.jumpPressed = false
     end
@@ -535,6 +547,17 @@ task.spawn(function()
             comboState.jumpPressed = true
             comboState.lastJump = tick()
             tryUppercutDash()
+            -- backup: if pattern on and recently hit, force pattern
+            if comboState.hits >= 2 and Config.Enabled then
+                task.delay(0.08, function()
+                    if Config.SolitudeHeart or Config.SolitudeP or Config.SolitudeR
+                        or Config.PatternTwinnie or Config.PatternBoomy
+                        or Config.PatternLordHeaven or Config.PatternVoid
+                        or Config.PatternDoopy then
+                        solitudeAfterUppercut()
+                    end
+                end)
+            end
         end)
         hum.StateChanged:Connect(function(_, new)
             if new == Enum.HumanoidStateType.Jumping then
@@ -817,6 +840,12 @@ local function makeTechToggle(text, key)
             for k in pairs(patternKeys) do
                 if k ~= key then Config[k] = false end
             end
+            Config.Enabled = true
+            Config.LethalEnabled = true
+            pcall(function()
+                ToggleBtn.Text = "  Loop Dash: ON"
+                ToggleIndicator.BackgroundColor3 = Color3.fromRGB(80, 255, 120)
+            end)
         end
         refresh()
     end)
