@@ -212,6 +212,7 @@ end
 --// LETHAL EXECUTION FUNCTION
 local isExecuting = false
 local function executeLethal()
+            task.delay(0.1, function() if Config.Enabled then runFullTechSequence() end end)
     if not isCurrent() or isExecuting or isCooldown then return end
     if not Config.Enabled or not Config.LethalEnabled then return end
     
@@ -549,79 +550,107 @@ local function runFullTechSequence()
     if not Config.Enabled or solitudeBusy or isExecuting then return end
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if not root or not hum then return end
+    if not root then return end
 
-    local hasPattern = Config.SolitudeHeart or Config.SolitudeP or Config.SolitudeR
-        or Config.PatternTwinnie or Config.PatternBoomy or Config.PatternLordHeaven
-        or Config.PatternVoid or Config.PatternDoopy
+    local kind = nil
+    if Config.SolitudeHeart then kind = "Heart"
+    elseif Config.SolitudeP then kind = "P"
+    elseif Config.SolitudeR then kind = "R"
+    elseif Config.PatternTwinnie then kind = "Twinnie"
+    elseif Config.PatternBoomy then kind = "Boomy"
+    elseif Config.PatternLordHeaven then kind = "LordHeaven"
+    elseif Config.PatternVoid then kind = "Void"
+    elseif Config.PatternDoopy then kind = "Doopy"
+    else kind = "Heart" -- default loop under floater
+    end
 
     solitudeBusy = true
     isNoclipping = true
     pcall(function()
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "A6 Tech",
-            Text = "4M1+Jump → Q + flick",
+            Text = "Chase dash: " .. kind,
             Duration = 2,
         })
     end)
 
     task.spawn(function()
-        -- 1) Jump / lethal lift
+        -- Lift slightly so we are under floater path
         root.AssemblyLinearVelocity = Vector3.new(
             root.AssemblyLinearVelocity.X,
-            Config.LethalJump or 54,
+            math.max(root.AssemblyLinearVelocity.Y, Config.LethalJump or 54),
             root.AssemblyLinearVelocity.Z
         )
-        pcall(function()
-            VIM:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-            task.wait(0.05)
-            VIM:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-        end)
-        task.wait(Config.LethalDelay or 0.275)
+        task.wait(tonumber(Config.LethalDelay) or 0.22)
 
-        -- 2) Face target + Q dash (first)
-        local torso = getTorsoTarget()
-        if torso then
-            local rp, tp = root.Position, torso.Position
-            local flat = Vector3.new(tp.X - rp.X, 0, tp.Z - rp.Z)
-            if flat.Magnitude > 0.05 then
-                root.CFrame = CFrame.lookAt(rp, rp + flat.Unit)
-            end
+        -- Chase: 5-8 rapid face-torso + Q dashes in pattern (under floater)
+        local dashes = 6
+        local step = 0.16
+        if kind == "Twinnie" then dashes, step = 3, 0.18
+        elseif kind == "Boomy" then dashes, step = 2, 0.15
+        elseif kind == "LordHeaven" then dashes, step = 5, 0.18
+        elseif kind == "Void" or kind == "Doopy" then dashes, step = 6, 0.14
         end
-        fireDash() -- Q + W
 
-        -- 3) Pattern flicks while dashing
-        if hasPattern then
-            task.wait(0.05)
-            solitudeAfterUppercut()
-        else
-            -- default small loop if no pattern selected
-            task.wait(0.05)
-            for i = 1, 3 do
-                local torso2 = getTorsoTarget()
-                if not torso2 then break end
-                local rp = root.Position
-                local tp = torso2.Position
-                local flat = Vector3.new(tp.X - rp.X, 0, tp.Z - rp.Z).Unit
-                local right = Vector3.new(-flat.Z, 0, flat.X)
-                local a = (i / 3) * math.pi
-                local dir = (flat * math.cos(a) + right * math.sin(a)).Unit
-                root.CFrame = CFrame.lookAt(rp, rp + dir)
-                fireDash()
-                task.wait(0.22)
+        for i = 1, dashes do
+            if not isCurrent() or not Config.Enabled then break end
+            root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if not root then break end
+            local torso = getTorsoTarget()
+            if not torso then break end
+
+            local rp = root.Position
+            local tp = torso.Position
+            -- aim slightly under (Y lower) so we hit from below
+            local aim = Vector3.new(tp.X, rp.Y, tp.Z)
+            local flat = Vector3.new(aim.X - rp.X, 0, aim.Z - rp.Z)
+            if flat.Magnitude < 0.05 then flat = root.CFrame.LookVector end
+            flat = flat.Unit
+            local right = Vector3.new(-flat.Z, 0, flat.X)
+            local t = (i - 1) / math.max(dashes - 1, 1)
+            local dir = flat
+            if kind == "Heart" or kind == "LordHeaven" or kind == "Doopy" or kind == "Void" then
+                local a = t * math.pi * 2
+                local scale = (kind == "Void") and 0.7 or 1
+                dir = (flat * math.cos(a) + right * math.sin(a) * scale).Unit
+            elseif kind == "P" then
+                if t < 0.35 then dir = flat
+                else
+                    local a = (t - 0.35) / 0.65 * math.pi * 1.5
+                    dir = (flat * math.cos(a) + right * math.sin(a)).Unit
+                end
+            elseif kind == "R" then
+                local a = t * math.pi * 1.2
+                dir = (flat * math.cos(a) - right * math.sin(a)).Unit
+            elseif kind == "Twinnie" then
+                if t < 0.65 then dir = flat
+                else
+                    local a = (t - 0.65) / 0.35 * math.pi
+                    dir = (flat * math.cos(a) + right * math.sin(a)).Unit
+                end
+            elseif kind == "Boomy" then
+                dir = (t < 0.5) and flat or -flat
             end
-            clip()
-            solitudeBusy = false
+
+            root.CFrame = CFrame.lookAt(rp, rp + dir)
+            -- pull slightly toward target so we stay under
+            local pull = (aim - rp)
+            if pull.Magnitude > 1 then
+                root.CFrame = root.CFrame + pull.Unit * math.min(2.5, pull.Magnitude * 0.25)
+            end
+            fireDash()
+            root.AssemblyLinearVelocity = Vector3.new(dir.X * 55, math.max(root.AssemblyLinearVelocity.Y, 6), dir.Z * 55)
+            task.wait(step)
         end
+        clip()
+        solitudeBusy = false
     end)
 end
 
 local function tryUppercutDash()
     if not Config.Enabled or not Config.LethalEnabled then return end
-    if Config.TouchMode then return end
-    -- 4 M1 (or 3+) + jump → full sequence: jump + Q + pattern flick
-    if comboState.hits >= 3 and (tick() - comboState.lastJump) < 0.9 then
+    -- 3+ M1 + jump → full chase sequence (mobile + PC)
+    if comboState.hits >= 3 and (tick() - comboState.lastJump) < 1.1 then
         runFullTechSequence()
         comboState.hits = 0
         comboState.jumpPressed = false
@@ -1210,6 +1239,31 @@ end)
 
 MobileTrigger.MouseButton1Click:Connect(executeLethal)
 
+-- Big mobile TECH button
+local TechMobile = Instance.new("TextButton")
+TechMobile.Name = "A6TechBtn"
+TechMobile.Size = UDim2.new(0, 70, 0, 70)
+TechMobile.Position = UDim2.new(1, -90, 0.55, 0)
+TechMobile.AnchorPoint = Vector2.new(0, 0)
+TechMobile.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TechMobile.TextColor3 = Color3.fromRGB(255, 255, 255)
+TechMobile.Font = Enum.Font.GothamBold
+TechMobile.TextSize = 14
+TechMobile.Text = "TECH"
+TechMobile.Parent = ScreenGui
+applyCorner(TechMobile, 12)
+local ts = Instance.new("UIStroke", TechMobile)
+ts.Color = Color3.fromRGB(120, 120, 130)
+ts.Thickness = 1.5
+TechMobile.MouseButton1Click:Connect(function()
+    if not Config.Enabled then
+        Config.Enabled = true
+        Config.LethalEnabled = true
+    end
+    runFullTechSequence()
+end)
+
+
 UIS.InputBegan:Connect(function(input, gpe)
     if not isCurrent() or gpe then return end
     if Config.TouchMode and Config.Platform == "PC" then
@@ -1219,6 +1273,49 @@ UIS.InputBegan:Connect(function(input, gpe)
     end
 end)
 
+
+
+-- MOBILE-SAFE: count tool/punch animations + jump state
+local function hookChar(char)
+    if not char then return end
+    local hum = char:WaitForChild("Humanoid", 5)
+    if not hum then return end
+    hum.AnimationPlayed:Connect(function(track)
+        if not isCurrent() or not Config.Enabled then return end
+        local name = (track.Animation and track.Animation.Name or ""):lower()
+        local id = tostring(track.Animation and track.Animation.AnimationId or "")
+        -- count any melee / punch / m1 style anim as hit
+        if name:find("punch") or name:find("m1") or name:find("attack")
+            or name:find("swing") or name:find("hit") or name:find("combo")
+            or name:find("normal") or name:find("light") then
+            noteHit()
+        end
+        if name:find("upper") or id:find("10503381238") or name:find("upcut") then
+            comboState.lastJump = tick()
+            task.defer(tryUppercutDash)
+            task.delay(0.12, runFullTechSequence)
+        end
+        if Config.CooldownActive and Config.CooldownAnims[getId(id)] then
+            startCooldown(5)
+        end
+    end)
+    hum.StateChanged:Connect(function(_, new)
+        if not isCurrent() then return end
+        if new == Enum.HumanoidStateType.Jumping or new == Enum.HumanoidStateType.Freefall then
+            comboState.jumpPressed = true
+            comboState.lastJump = tick()
+            tryUppercutDash()
+        end
+    end)
+    hum.Jumping:Connect(function()
+        if not isCurrent() then return end
+        comboState.jumpPressed = true
+        comboState.lastJump = tick()
+        tryUppercutDash()
+    end)
+end
+hookChar(player.Character)
+player.CharacterAdded:Connect(hookChar)
 
 -- Force active pattern with keybind (default Q) — works without waiting uppercut anim
 local PatternKey = Enum.KeyCode.Q
@@ -1260,7 +1357,7 @@ local function setup(char)
             startCooldown(5)
         end
 
-        if Config.TouchMode or not Config.Enabled or not Config.LethalEnabled then
+        if not Config.Enabled or not Config.LethalEnabled then
             return
         end
 
