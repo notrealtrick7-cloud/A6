@@ -92,52 +92,63 @@ end
 local function fireDash()
     local char = player.Character
     if not char then return end
-    -- 1) TSB Communicate remote (several arg layouts)
-    local communicate = char:FindFirstChild("Communicate")
-    if communicate and communicate:IsA("RemoteEvent") then
-        pcall(function()
-            communicate:FireServer({
-                Dash = Enum.KeyCode.W,
-                Key = Enum.KeyCode.Q,
-                Goal = "KeyPress"
-            })
-        end)
-        pcall(function()
-            communicate:FireServer({
-                Goal = "KeyPress",
-                Key = Enum.KeyCode.Q
-            })
-        end)
-        pcall(function()
-            communicate:FireServer("Dash", "Front")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+
+    -- Delta-friendly: scan remotes named Communicate / Dash / Combat
+    for _, r in ipairs(char:GetDescendants()) do
+        if r:IsA("RemoteEvent") then
+            local n = r.Name:lower()
+            if n:find("communicate") or n:find("dash") or n:find("combat") or n:find("input") then
+                pcall(function()
+                    r:FireServer({ Goal = "KeyPress", Key = Enum.KeyCode.Q, Dash = Enum.KeyCode.W })
+                end)
+                pcall(function()
+                    r:FireServer({ Goal = "KeyPress", Key = Enum.KeyCode.Q })
+                end)
+                pcall(function()
+                    r:FireServer("KeyPress", Enum.KeyCode.Q)
+                end)
+            end
+        end
+    end
+    -- Also ReplicatedStorage common paths
+    pcall(function()
+        local rs = game:GetService("ReplicatedStorage")
+        for _, r in ipairs(rs:GetDescendants()) do
+            if r:IsA("RemoteEvent") and (r.Name:lower():find("dash") or r.Name == "Communicate") then
+                r:FireServer({ Goal = "KeyPress", Key = Enum.KeyCode.Q })
+            end
+        end
+    end)
+
+    -- Physical dash (works on Delta when remote ignored)
+    if root then
+        local look = root.CFrame.LookVector
+        local power = 56
+        root.AssemblyLinearVelocity = Vector3.new(look.X * power, math.max(root.AssemblyLinearVelocity.Y, 10), look.Z * power)
+        -- short BodyVelocity for reliable push
+        local bv = Instance.new("BodyVelocity")
+        bv.MaxForce = Vector3.new(8e4, 0, 8e4)
+        bv.Velocity = Vector3.new(look.X * power, 0, look.Z * power)
+        bv.Parent = root
+        task.delay(0.18, function()
+            if bv then bv:Destroy() end
         end)
     end
-    -- 2) VirtualInput fallback: press Q (dash) + hold W briefly
+    if hum then
+        pcall(function() hum:Move(root.CFrame.LookVector, true) end)
+    end
+
+    -- VIM last (Delta sometimes allows)
     pcall(function()
         VIM:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
-        task.wait(0.03)
+        task.wait(0.02)
         VIM:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
-    end)
-    pcall(function()
-        VIM:SendKeyEvent(true, Enum.KeyCode.W, false, game)
-        task.delay(0.12, function()
-            VIM:SendKeyEvent(false, Enum.KeyCode.W, false, game)
-        end)
-    end)
-    -- 3) Humanoid Move in look direction as last resort
-    pcall(function()
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        local root = char:FindFirstChild("HumanoidRootPart")
-        if hum and root then
-            hum:Move(root.CFrame.LookVector, true)
-            task.delay(0.15, function()
-                if hum then hum:Move(Vector3.zero, true) end
-            end)
-        end
     end)
 end
 
---// HELPER FUNCTIONS
+
 local function clip()
     isNoclipping = false
     if player.Character then
@@ -308,6 +319,7 @@ end
 --// SOLITUDE TECH PATTERNS (Heart / P / R)
 -- Community Solitude dash: after uppercut, loop front/side dashes under floater
 local solitudeBusy = false
+local solitudeBusyAt = 0
 local function runSolitudePattern(kind)
     if solitudeBusy or not Config.Enabled then return end
     pcall(function()
@@ -564,13 +576,19 @@ local function runFullTechSequence()
     else kind = "Heart" -- default loop under floater
     end
 
+    if solitudeBusy then
+        -- allow re-entry after soft timeout
+        if tick() - (solitudeBusyAt or 0) < 1.2 then return end
+    end
     solitudeBusy = true
+    solitudeBusyAt = tick()
     isNoclipping = true
+    isExecuting = true
     pcall(function()
         game:GetService("StarterGui"):SetCore("SendNotification", {
             Title = "A6 Tech",
             Text = "Chase dash: " .. kind,
-            Duration = 2,
+            Duration = 1.5,
         })
     end)
 
@@ -644,6 +662,8 @@ local function runFullTechSequence()
         end
         clip()
         solitudeBusy = false
+        isExecuting = false
+        isNoclipping = false
     end)
 end
 
@@ -1389,4 +1409,21 @@ RunService.Stepped:Connect(function()
 end)
 
 if player.Character then setup(player.Character) end
+
+-- Watchdog: never stay busy > 2.5s (fixes "only works once")
+task.spawn(function()
+    while isCurrent() do
+        task.wait(0.5)
+        if solitudeBusy and solitudeBusyAt and (tick() - solitudeBusyAt) > 2.5 then
+            solitudeBusy = false
+            isExecuting = false
+            isNoclipping = false
+            pcall(clip)
+        end
+        if isExecuting and solitudeBusyAt and (tick() - solitudeBusyAt) > 2.5 then
+            isExecuting = false
+        end
+    end
+end)
+
 player.CharacterAdded:Connect(setup)
