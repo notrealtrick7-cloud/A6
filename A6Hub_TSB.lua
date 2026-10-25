@@ -44,6 +44,19 @@ local Config = {
     InstantTwisted = false,   -- 4 M1 + stepback + Q dash + L/R/straight flick
     SolitudeDashCount = 4,
     SolitudeOrbitTime = 0.28,
+    -- Per-tech settings (like other TSB scripts: delay / dashes / turn)
+    TwinnieDashes = 3,
+    TwinnieStep = 0.22,
+    BoomyDashes = 2,
+    BoomyStep = 0.18,
+    LordHeavenDashes = 5,
+    LordHeavenStep = 0.25,
+    VoidDashes = 4,
+    VoidStep = 0.20,
+    DoopyDashes = 5,
+    DoopyStep = 0.22,
+    InstantTwistedStep = 0.12,
+    InstantTwistedBack = 2.2,
     LethalDelay = 0.275,
     LethalJump = 54,
     LethalAccuracy = 15,
@@ -269,8 +282,27 @@ local function runSolitudePattern(kind)
     if not root or not hum or not cam then return end
     solitudeBusy = true
     isNoclipping = true
-    local n = math.clamp(tonumber(Config.SolitudeDashCount) or 4, 1, 10)
-    local step = tonumber(Config.SolitudeOrbitTime) or 0.28
+    local n, step = 4, 0.28
+    if kind == "Twinnie" then
+        n = tonumber(Config.TwinnieDashes) or 3
+        step = tonumber(Config.TwinnieStep) or 0.22
+    elseif kind == "Boomy" then
+        n = tonumber(Config.BoomyDashes) or 2
+        step = tonumber(Config.BoomyStep) or 0.18
+    elseif kind == "LordHeaven" then
+        n = tonumber(Config.LordHeavenDashes) or 5
+        step = tonumber(Config.LordHeavenStep) or 0.25
+    elseif kind == "Void" then
+        n = tonumber(Config.VoidDashes) or 4
+        step = tonumber(Config.VoidStep) or 0.20
+    elseif kind == "Doopy" then
+        n = tonumber(Config.DoopyDashes) or 5
+        step = tonumber(Config.DoopyStep) or 0.22
+    elseif kind == "Heart" or kind == "P" or kind == "R" then
+        n = tonumber(Config.SolitudeDashCount) or 4
+        step = tonumber(Config.SolitudeOrbitTime) or 0.28
+    end
+    n = math.clamp(n, 1, 12)
     -- Community Solitude: after uppercut, stay under floater and
     -- flick camera/character in letter-shaped paths (P / R / Heart) while front-dashing.
     task.spawn(function()
@@ -415,7 +447,7 @@ local function runInstantTwisted()
             root.CFrame = CFrame.lookAt(rp, rp + dir)
             if cam then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, cam.CFrame.Position + dir) end
             fireDash()
-            task.wait(0.12)
+            task.wait(tonumber(Config.InstantTwistedStep) or 0.12)
         end
         clip()
         solitudeBusy = false
@@ -438,7 +470,7 @@ UIS.InputBegan:Connect(function(input, gpe)
             local char = player.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if root then
-                root.CFrame = root.CFrame * CFrame.new(0, 0, 2.2) -- step back
+                root.CFrame = root.CFrame * CFrame.new(0, 0, tonumber(Config.InstantTwistedBack) or 2.2)
             end
             task.delay(0.05, runInstantTwisted)
             twistedState.hits = 0
@@ -470,6 +502,7 @@ local function tryUppercutDash()
     -- typical TSB: 3-4 M1 then jump during last hits = uppercut
     if comboState.hits >= 3 and (tick() - comboState.lastJump) < 0.45 then
         executeLethal()
+        task.defer(solitudeAfterUppercut)
         comboState.hits = 0
         comboState.jumpPressed = false
     end
@@ -886,6 +919,27 @@ CooldownBtn.Font = Enum.Font.Gotham
 CooldownBtn.TextSize = 11
 applyCorner(CooldownBtn, 4)
 
+-- Per-tech settings labels in Settings tab
+local function techSetting(name, key)
+    CreateInput(name, key)
+end
+techSetting("Solitude Dashes", "SolitudeDashCount")
+techSetting("Solitude Step", "SolitudeOrbitTime")
+techSetting("Twinnie Dashes", "TwinnieDashes")
+techSetting("Twinnie Step", "TwinnieStep")
+techSetting("Boomy Dashes", "BoomyDashes")
+techSetting("Boomy Step", "BoomyStep")
+techSetting("LordHeaven Dashes", "LordHeavenDashes")
+techSetting("LordHeaven Step", "LordHeavenStep")
+techSetting("Void Dashes", "VoidDashes")
+techSetting("Void Step", "VoidStep")
+techSetting("Doopy Dashes", "DoopyDashes")
+techSetting("Doopy Step", "DoopyStep")
+techSetting("InstTwist Step", "InstantTwistedStep")
+techSetting("InstTwist Back", "InstantTwistedBack")
+SettingsContainer.CanvasSize = UDim2.new(0, 0, 0, 720)
+
+
 --// COOLDOWN UI BAR
 CooldownBar = Instance.new("Frame", MainFrame)
 CooldownBar.Name = "CooldownBar"
@@ -1034,6 +1088,28 @@ UIS.InputBegan:Connect(function(input, gpe)
     if not isCurrent() or gpe then return end
     if Config.TouchMode and Config.Platform == "PC" then
         if input.KeyCode == Enum.KeyCode[Config.Keybind:upper()] then
+            executeLethal()
+        end
+    end
+end)
+
+
+-- Force active pattern with keybind (default Q) — works without waiting uppercut anim
+local PatternKey = Enum.KeyCode.Q
+UIS.InputBegan:Connect(function(input, gpe)
+    if gpe or not isCurrent() then return end
+    if input.KeyCode == PatternKey then
+        if not Config.Enabled then return end
+        if Config.InstantTwisted then
+            runInstantTwisted()
+            return
+        end
+        -- any pattern on → run it
+        solitudeAfterUppercut()
+        -- if no pattern, still try lethal
+        if not (Config.SolitudeHeart or Config.SolitudeP or Config.SolitudeR
+            or Config.PatternTwinnie or Config.PatternBoomy or Config.PatternLordHeaven
+            or Config.PatternVoid or Config.PatternDoopy) then
             executeLethal()
         end
     end
