@@ -92,15 +92,49 @@ end
 local function fireDash()
     local char = player.Character
     if not char then return end
+    -- 1) TSB Communicate remote (several arg layouts)
     local communicate = char:FindFirstChild("Communicate")
-    if communicate then
-        local args = {{
-            Dash = Enum.KeyCode.W,
-            Key = Enum.KeyCode.Q,
-            Goal = "KeyPress"
-        }}
-        communicate:FireServer(unpack(args))
+    if communicate and communicate:IsA("RemoteEvent") then
+        pcall(function()
+            communicate:FireServer({
+                Dash = Enum.KeyCode.W,
+                Key = Enum.KeyCode.Q,
+                Goal = "KeyPress"
+            })
+        end)
+        pcall(function()
+            communicate:FireServer({
+                Goal = "KeyPress",
+                Key = Enum.KeyCode.Q
+            })
+        end)
+        pcall(function()
+            communicate:FireServer("Dash", "Front")
+        end)
     end
+    -- 2) VirtualInput fallback: press Q (dash) + hold W briefly
+    pcall(function()
+        VIM:SendKeyEvent(true, Enum.KeyCode.Q, false, game)
+        task.wait(0.03)
+        VIM:SendKeyEvent(false, Enum.KeyCode.Q, false, game)
+    end)
+    pcall(function()
+        VIM:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+        task.delay(0.12, function()
+            VIM:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+        end)
+    end)
+    -- 3) Humanoid Move in look direction as last resort
+    pcall(function()
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if hum and root then
+            hum:Move(root.CFrame.LookVector, true)
+            task.delay(0.15, function()
+                if hum then hum:Move(Vector3.zero, true) end
+            end)
+        end
+    end)
 end
 
 --// HELPER FUNCTIONS
@@ -392,6 +426,13 @@ local function runSolitudePattern(kind)
                 cam.CFrame = CFrame.lookAt(cam.CFrame.Position, cam.CFrame.Position + dir)
             end
             fireDash()
+            pcall(function()
+                local r = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                if r then
+                    local look = r.CFrame.LookVector
+                    r.AssemblyLinearVelocity = Vector3.new(look.X * 48, math.max(r.AssemblyLinearVelocity.Y, 8), look.Z * 48)
+                end
+            end)
             task.wait(step)
         end
         clip()
@@ -503,18 +544,85 @@ local function noteHit()
     comboState.lastHit = now
 end
 
-local function tryUppercutDash()
-    if not Config.Enabled or not Config.LethalEnabled then return end
-    if Config.TouchMode then return end
+-- Full auto sequence: 4 M1 + Jump detected → jump boost + Q dash + pattern flicks
+local function runFullTechSequence()
+    if not Config.Enabled or solitudeBusy or isExecuting then return end
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then return end
+
     local hasPattern = Config.SolitudeHeart or Config.SolitudeP or Config.SolitudeR
         or Config.PatternTwinnie or Config.PatternBoomy or Config.PatternLordHeaven
         or Config.PatternVoid or Config.PatternDoopy
-    -- looser window: 2+ M1 and jump within 0.7s
-    if comboState.hits >= 2 and (tick() - comboState.lastJump) < 0.7 then
-        executeLethal()
-        if hasPattern then
-            task.delay(0.05, solitudeAfterUppercut)
+
+    solitudeBusy = true
+    isNoclipping = true
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "A6 Tech",
+            Text = "4M1+Jump → Q + flick",
+            Duration = 2,
+        })
+    end)
+
+    task.spawn(function()
+        -- 1) Jump / lethal lift
+        root.AssemblyLinearVelocity = Vector3.new(
+            root.AssemblyLinearVelocity.X,
+            Config.LethalJump or 54,
+            root.AssemblyLinearVelocity.Z
+        )
+        pcall(function()
+            VIM:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+            task.wait(0.05)
+            VIM:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+        end)
+        task.wait(Config.LethalDelay or 0.275)
+
+        -- 2) Face target + Q dash (first)
+        local torso = getTorsoTarget()
+        if torso then
+            local rp, tp = root.Position, torso.Position
+            local flat = Vector3.new(tp.X - rp.X, 0, tp.Z - rp.Z)
+            if flat.Magnitude > 0.05 then
+                root.CFrame = CFrame.lookAt(rp, rp + flat.Unit)
+            end
         end
+        fireDash() -- Q + W
+
+        -- 3) Pattern flicks while dashing
+        if hasPattern then
+            task.wait(0.05)
+            solitudeAfterUppercut()
+        else
+            -- default small loop if no pattern selected
+            task.wait(0.05)
+            for i = 1, 3 do
+                local torso2 = getTorsoTarget()
+                if not torso2 then break end
+                local rp = root.Position
+                local tp = torso2.Position
+                local flat = Vector3.new(tp.X - rp.X, 0, tp.Z - rp.Z).Unit
+                local right = Vector3.new(-flat.Z, 0, flat.X)
+                local a = (i / 3) * math.pi
+                local dir = (flat * math.cos(a) + right * math.sin(a)).Unit
+                root.CFrame = CFrame.lookAt(rp, rp + dir)
+                fireDash()
+                task.wait(0.22)
+            end
+            clip()
+            solitudeBusy = false
+        end
+    end)
+end
+
+local function tryUppercutDash()
+    if not Config.Enabled or not Config.LethalEnabled then return end
+    if Config.TouchMode then return end
+    -- 4 M1 (or 3+) + jump → full sequence: jump + Q + pattern flick
+    if comboState.hits >= 3 and (tick() - comboState.lastJump) < 0.9 then
+        runFullTechSequence()
         comboState.hits = 0
         comboState.jumpPressed = false
     end
@@ -547,17 +655,6 @@ task.spawn(function()
             comboState.jumpPressed = true
             comboState.lastJump = tick()
             tryUppercutDash()
-            -- backup: if pattern on and recently hit, force pattern
-            if comboState.hits >= 2 and Config.Enabled then
-                task.delay(0.08, function()
-                    if Config.SolitudeHeart or Config.SolitudeP or Config.SolitudeR
-                        or Config.PatternTwinnie or Config.PatternBoomy
-                        or Config.PatternLordHeaven or Config.PatternVoid
-                        or Config.PatternDoopy then
-                        solitudeAfterUppercut()
-                    end
-                end)
-            end
         end)
         hum.StateChanged:Connect(function(_, new)
             if new == Enum.HumanoidStateType.Jumping then
@@ -797,7 +894,7 @@ applyCorner(ToggleIndicator, 5)
 local Hint = Instance.new("TextLabel", HomeContainer)
 Hint.Size = UDim2.new(1, 0, 0, 18)
 Hint.BackgroundTransparency = 1
-Hint.Text = "M1 x3-4 + Jump = uppercut dash (Loop Dash ON)"
+Hint.Text = "AUTO: M1 x4 + Jump = Q dash + pattern flick"
 Hint.TextColor3 = Color3.fromRGB(140, 140, 150)
 Hint.Font = Enum.Font.Gotham
 Hint.TextSize = 10
