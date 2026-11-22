@@ -57,13 +57,85 @@ local function hexColor(h)
 	return Color3.fromRGB(tonumber(h:sub(1, 2), 16), tonumber(h:sub(3, 4), 16), tonumber(h:sub(5, 6), 16))
 end
 V.ThemePalettes = {
+	-- Core
 	Red = {"60241E", "95271D", "B34A44", "E77B49"},
 	Green = {"092328", "12544F", "2A835F", "8BBB92"},
 	Blue = {"293681", "4274D9", "95CCDD", "D0E7E6"},
 	Brown = {"000000", "1F150C", "412D15", "E1DCC9"},
 	Purple = {"4C2365", "7F5D99", "9E7EB5", "C4A4DA"},
+	Orange = {"2A1508", "7A3A12", "C45E1A", "F0A35A"},
+	Pink = {"2A1020", "7A2A55", "C45A90", "F0A0C8"},
+	Cyan = {"062028", "0E5A68", "2AA8B8", "A0E8F0"},
+	Gold = {"1A1408", "6B4E12", "C9A227", "F5E6A3"},
+	Midnight = {"050510", "12122A", "2A2A55", "A0A0D0"},
+	Crimson = {"1A0508", "6B1018", "C02030", "F08090"},
+	Forest = {"05140A", "0E3A1C", "1E7A3A", "90D0A8"},
+	-- Requested pack
+	Shadow = {"0A0612", "1A0F2A", "3A2060", "C8B0E8"},
+	Violet = {"1A0A28", "3A1A5A", "7A3AB0", "D8B8F8"},
+	Scarlet = {"28080C", "6A1018", "C01828", "F09098"},
+	Obsidian = {"080808", "141414", "2A2A2A", "C0C0C0"},
+	Slate = {"12161C", "1E2630", "3A4A5A", "C8D0D8"},
+	Silver = {"1A1C20", "2E3238", "8A9098", "E8ECF0"},
+	Sepia = {"1C140C", "3A2A18", "8A6A3A", "E8D8B8"},
+	Ocean = {"041820", "0A3A4A", "1A7A90", "A0D8E8"},
+	Sky = {"0C1828", "1A3A5A", "4A90C8", "C0E0F8"},
+	Teal = {"062018", "0E4A40", "1A9080", "A0E8D8"},
+	Indigo = {"0C0C28", "1A1A5A", "3A3AA0", "B0B0F0"},
+	Nord = {"0C141C", "1A2838", "4A6A88", "C0D0E0"},
+	Emerald = {"041810", "0A3A24", "18A060", "90E8C0"},
+	Mint = {"0C1C18", "1A3A34", "40A890", "B8F0E0"},
+	Olive = {"14180C", "2A3418", "6A7A30", "D0D8A0"},
+	Lime = {"101808", "2A3A10", "70B020", "D0F080"},
+	Amber = {"1C1408", "4A3010", "C08020", "F0D080"},
+	Sunset = {"281408", "6A2810", "E06020", "F0B080"},
+	Coral = {"281010", "6A2828", "E06060", "F0B0B0"},
+	Rose = {"241018", "5A2030", "C05070", "F0B0C0"},
+	Lavender = {"181028", "3A2858", "8870B8", "D8C8F0"},
+	Magenta = {"240818", "5A1038", "C02080", "F090C8"},
+	Charcoal = {"0E0E10", "1A1A1E", "3A3A42", "B8B8C0"},
+	Graphite = {"101214", "1C2024", "3A4248", "B0B8C0"},
+	Ash = {"161616", "262626", "4A4A4A", "C8C8C8"},
+	Ivory = {"E8E4D8", "F2EEE4", "D8D0C0", "2A2820"},
+	Cream = {"F0EBE0", "F8F4EC", "E0D8C8", "2C2820"},
+	Cobalt = {"081428", "102860", "2050C0", "A0C0F0"},
+	Navy = {"060E1C", "0C1C38", "1A3A70", "90B0D8"},
+	Azure = {"081828", "103A60", "2088D0", "A0D8F8"},
+	Turquoise = {"06201C", "0E4A44", "18A090", "90E8E0"},
+	Glacier = {"0C1820", "1A3040", "60A0B8", "D0E8F0"},
+	Sage = {"141C14", "2A3A2A", "6A8A68", "C8D8C0"},
+	Jade = {"081C14", "103A28", "28A070", "A0E8C8"},
+	Moss = {"10180C", "243818", "4A7040", "B0D0A0"},
+	Pine = {"08140C", "102818", "1A5030", "90C0A0"},
+	Matcha = {"141C10", "2A3A1C", "70A040", "D0E8A8"},
+	Peach = {"281810", "6A3A28", "E09060", "F8D0B0"},
+	Terracotta = {"24140C", "5A2A18", "C05030", "E8A888"},
+	Ruby = {"20080C", "5A1018", "C01838", "F08098"},
+	Maroon = {"18080C", "401018", "801828", "D08090"},
+	Sand = {"1C1810", "4A3C28", "C0A070", "F0E0C0"},
+	Coffee = {"140E08", "2A1C10", "5A3A20", "D0B090"},
+	Bronze = {"1A1008", "3A2410", "8A5A20", "E0C090"},
+	Plum = {"180C18", "3A1838", "7A3068", "D8A0C8"},
+	Orchid = {"1C1024", "3A2050", "8A50A0", "E0B8F0"},
+	Lilac = {"1C1828", "3A3050", "9080B8", "E0D8F0"},
+	Blush = {"28181C", "5A3038", "C08090", "F0D0D8"},
+	Sakura = {"281820", "5A3040", "E090A8", "F8D8E0"},
+	Neon = {"0A0014", "1A0030", "A020F0", "E080FF"},
+	Galaxy = {"080818", "14103A", "4A28A0", "C0A0F8"},
+	Twilight = {"140C18", "3A1830", "A04060", "F0B0C0"},
+	Aurora = {"06141C", "0E3A48", "30A090", "A0F0E0"},
+	Rainbow = {"0A0A12", "1A1228", "8844CC", "F0E0FF"},
 }
-V.ThemeOrder = {"Dark", "Purple", "Blue", "Green", "Red", "Light", "Brown", "DarkGlass"}
+V.ThemeOrder = {
+	"Dark", "DarkGlass", "Obsidian", "Charcoal", "Graphite", "Ash", "Slate", "Silver",
+	"Light", "LightGlass", "Ivory", "Cream",
+	"Shadow", "Midnight", "Navy", "Indigo", "Cobalt", "Blue", "Azure", "Sky", "Ocean", "Teal", "Turquoise", "Cyan", "Glacier", "Nord",
+	"Forest", "Pine", "Moss", "Jade", "Emerald", "Green", "Sage", "Matcha", "Mint", "Olive", "Lime",
+	"Brown", "Coffee", "Bronze", "Sand", "Sepia", "Gold", "Amber", "Peach", "Orange", "Sunset", "Terracotta",
+	"Red", "Scarlet", "Crimson", "Ruby", "Maroon", "Coral", "Rose", "Blush", "Sakura", "Pink",
+	"Purple", "Violet", "Plum", "Orchid", "Lilac", "Lavender", "Magenta",
+	"Neon", "Galaxy", "Twilight", "Aurora", "Rainbow",
+}
 V.Themes = {}
 do
 	local function gray(n) return Color3.fromRGB(n, n, n) end
@@ -97,12 +169,93 @@ do
 	brown.selection = brown.raised; brown.overlay = brown.panel; brown.rule = brown.raised
 	local glass = table.clone(dark); glass.panel = gray(10); glass.surface = gray(8)
 	V.Themes.DarkGlass = glass
+	-- Light glass (frosted white)
+	local lg = table.clone(light)
+	lg.bg = Color3.fromRGB(248, 250, 255); lg.panel = Color3.fromRGB(255, 255, 255)
+	lg.surface = Color3.fromRGB(245, 247, 252); lg.raised = Color3.fromRGB(230, 234, 245)
+	lg.stroke = Color3.fromRGB(200, 208, 230); lg.modalStroke = lg.stroke
+	lg.overlay = Color3.fromRGB(252, 253, 255); lg.selection = lg.raised
+	V.Themes.LightGlass = lg
 end
 V.theme = "Dark"
+V.themeFx = nil   -- RunService connection for animated themes
+V.AnimatedThemes = {Rainbow = true, Aurora = true, Galaxy = true, Neon = true, Twilight = true}
+
+local function hsv(h, s, v)
+	local i = math.floor(h * 6)
+	local f = h * 6 - i
+	local p, q, t_ = v * (1 - s), v * (1 - f * s), v * (1 - (1 - f) * s)
+	i = i % 6
+	if i == 0 then return Color3.new(v, t_, p)
+	elseif i == 1 then return Color3.new(q, v, p)
+	elseif i == 2 then return Color3.new(p, v, t_)
+	elseif i == 3 then return Color3.new(p, q, v)
+	elseif i == 4 then return Color3.new(t_, p, v)
+	else return Color3.new(v, p, q) end
+end
+
+function V.stopThemeFx()
+	if V.themeFx then V.themeFx:Disconnect(); V.themeFx = nil end
+end
+
+function V.startThemeFx(name)
+	V.stopThemeFx()
+	if not V.AnimatedThemes[name] then return end
+	local t0 = os.clock()
+	V.themeFx = RunService.RenderStepped:Connect(function()
+		if not V.alive or V.theme ~= name then V.stopThemeFx() return end
+		local u = (os.clock() - t0) * 0.12
+		local accent, raised, stroke
+		if name == "Rainbow" then
+			accent = hsv((u * 0.35) % 1, 0.85, 1)
+			raised = hsv((u * 0.35 + 0.08) % 1, 0.55, 0.28)
+			stroke = hsv((u * 0.35 + 0.2) % 1, 0.4, 0.45)
+		elseif name == "Aurora" then
+			local h = 0.45 + 0.12 * math.sin(u * 1.3)
+			accent = hsv(h % 1, 0.7, 0.95)
+			raised = hsv((h + 0.15) % 1, 0.45, 0.22)
+			stroke = hsv((h + 0.25) % 1, 0.35, 0.4)
+		elseif name == "Galaxy" then
+			local h = 0.72 + 0.08 * math.sin(u)
+			accent = hsv(h % 1, 0.75, 1)
+			raised = hsv((h + 0.1) % 1, 0.5, 0.2)
+			stroke = hsv((h + 0.18) % 1, 0.4, 0.38)
+		elseif name == "Neon" then
+			local pulse = 0.55 + 0.45 * (0.5 + 0.5 * math.sin(u * 4))
+			accent = hsv(0.78, 0.9, pulse)
+			raised = Color3.fromRGB(26, 0, 48)
+			stroke = hsv(0.78, 0.6, 0.5)
+		else -- Twilight
+			local h = 0.95 + 0.08 * math.sin(u * 0.8)
+			accent = hsv(h % 1, 0.7, 0.95)
+			raised = hsv((h + 0.12) % 1, 0.45, 0.22)
+			stroke = hsv((h + 0.2) % 1, 0.35, 0.4)
+		end
+		T.accent = accent
+		T.raised = raised
+		T.stroke = stroke
+		T.selection = raised
+		T.progress = raised
+		-- live paint a few key surfaces if UI exists
+		if V.window then
+			for _, o in ipairs(V.window:GetDescendants()) do
+				if o:IsA("UIStroke") and o.Name ~= "HoverStroke" then
+					o.Color = stroke
+				elseif o:IsA("TextButton") and o.BackgroundColor3 == T.raised then
+					-- skip busy update
+				end
+			end
+		end
+		if V.paint then pcall(V.paint) end
+	end)
+end
+
 function V.applyTheme(name)
 	if not V.Themes[name] then name = "Dark" end
+	V.stopThemeFx()
 	V.theme = name
-	for k, v in pairs(V.Themes[name]) do T[k] = v end   -- T is shared by every UI builder, so a rebuild picks the colours up
+	for k, v in pairs(V.Themes[name]) do T[k] = v end
+	V.startThemeFx(name)
 end
 
 -- ===============================================================
@@ -664,24 +817,45 @@ end
 V.tg = { active = false, endsAt = 0, wasTrain = false, wasThrow = false, powerSnap = nil }
 
 function F.tgDetectActive()
-	-- Heuristics: thanksgiving theme parts / attributes / UI
-	local ok = false
-	local names = {"Thanksgiving", "Feast", "TurkeyChef", "Turkey Chef", "PicnicTable", "EventHub"}
+	-- Live Feast only (theme / NPC / attributes). False outside the 5-min window.
+	local names = {
+		"Thanksgiving", "Feast", "TurkeyChef", "Turkey Chef", "PicnicTable", "EventHub",
+		"ThanksgivingTheme", "FeastActive", "EventThanksgiving",
+	}
 	for _, n in ipairs(names) do
-		if workspace:FindFirstChild(n, true) then ok = true break end
+		local o = workspace:FindFirstChild(n, true)
+		if o then
+			-- ignore permanent lobby props that always exist; prefer Active/Enabled flags
+			local a = o:GetAttribute("Active")
+			if a == nil or a == true then
+				if o:GetAttribute("Enabled") == false then
+					-- skip disabled
+				else
+					return true
+				end
+			end
+		end
 	end
-	if not ok then
-		local attr = workspace:GetAttribute("ThanksgivingActive") or workspace:GetAttribute("FeastActive")
-			or workspace:GetAttribute("EventActive")
-		if attr == true then ok = true end
-	end
-	if not ok and player:GetAttribute("Thanksgiving") then ok = true end
-	-- Client state flag if game exposes one
-	if not ok and G.State then
+	local attr = workspace:GetAttribute("ThanksgivingActive")
+		or workspace:GetAttribute("FeastActive")
+		or workspace:GetAttribute("EventActive")
+	if attr == true then return true end
+	if player:GetAttribute("Thanksgiving") == true then return true end
+	if G.State then
 		local s = G.State
-		if s.Thanksgiving or s.Feast or s.EventName == "Thanksgiving" then ok = true end
+		if s.Thanksgiving == true or s.Feast == true or s.EventName == "Thanksgiving" then return true end
+		if type(s.Get) == "function" then
+			local ok, v = pcall(s.Get, s, "Thanksgiving")
+			if ok and v then return true end
+		end
 	end
-	return ok
+	-- ReplicatedStorage flag folders
+	local rs = game:GetService("ReplicatedStorage")
+	for _, n in ipairs({"Thanksgiving", "Feast", "Events"}) do
+		local f = rs:FindFirstChild(n)
+		if f and (f:GetAttribute("Active") == true or f:GetAttribute("Enabled") == true) then return true end
+	end
+	return false
 end
 
 function F.tgSetPowerPlus20()
@@ -719,9 +893,15 @@ end
 function F.tgStop()
 	if not V.tg.active then return end
 	V.tg.active = false
-	-- restore prior farm mode
+	-- ALWAYS restore prior mode (do not keep throwing after Feast)
 	if V.SilentSetters and V.SilentSetters.autoThrow then
 		V.SilentSetters.autoThrow(V.tg.wasThrow == true)
+	end
+	if V.Flags then
+		-- hard sync flag if silent setter missing
+		if not V.SilentSetters or not V.SilentSetters.autoThrow then
+			V.Flags.autoThrow = (V.tg.wasThrow == true)
+		end
 	end
 	if V.SilentSetters and V.SilentSetters.autoTrain then
 		V.SilentSetters.autoTrain(V.tg.wasTrain == true)
@@ -834,35 +1014,37 @@ function F.tgLoop()
 	local lastCheck = 0
 	while V.alive do
 		local ok, err = pcall(function()
-			if not V.Flags.autoTgThrow then
-				if V.tg.active then F.tgStop() end
-			else
-				local now = os.clock()
-				if now - lastCheck >= 2 then
+			local now = os.clock()
+			-- Auto Throw Event: ONLY throw while Feast is live. Never outside the window.
+			if V.Flags.autoTgThrow then
+				if now - lastCheck >= 1.5 then
 					lastCheck = now
 					local live = F.tgDetectActive()
 					if live and not V.tg.active then
 						F.tgStart()
 					elseif V.tg.active then
-						if (not live and now > (V.tg.endsAt - 240)) or now >= V.tg.endsAt then
+						-- hard stop at 5 min or when theme ends
+						if (not live) or now >= (V.tg.endsAt or 0) then
 							F.tgStop()
-						elseif V.Flags.autoThrow ~= true then
-							-- keep throw on during event
-							if V.SilentSetters and V.SilentSetters.autoThrow then
+						else
+							-- keep throw ON only during active window
+							if V.SilentSetters and V.SilentSetters.autoThrow and V.Flags.autoThrow ~= true then
 								V.SilentSetters.autoThrow(true)
 							end
 						end
 					end
 				end
-				if V.Flags.autoTgCook and V.tg.active and not V.tgCooking then
-					-- single selected size only (Regular / Big / Mega)
-					F.tgCook(V.Flags.tgSandwich or "Regular")
-					task.wait(3.5)
-				end
+			else
+				if V.tg.active then F.tgStop() end
+			end
+			-- Auto Cook: only during active event, one size, TP to feast first
+			if V.Flags.autoTgCook and V.tg.active and not V.tgCooking then
+				F.tgCook(V.Flags.tgSandwich or "Regular")
+				task.wait(3.5)
 			end
 		end)
 		if not ok then warn("[A6Hub] tg: " .. tostring(err)) end
-		task.wait(0.5)
+		task.wait(0.4)
 	end
 end
 
@@ -2671,12 +2853,12 @@ function V.buildPages()
 	end)
 	p:Stat("Training", function() return (G.Training and G.Training.IsRunning and G.Training.IsRunning()) and "Running" or "Idle" end)
 
-	-- Thanksgiving Event
+	-- Thanksgiving Event (controls first, guide last)
 	p = P.thanksgiving
-	p:Section("Auto ThanksGiving Event")
-	p:Info("Event every ~30 min · lasts 5 min. Collect Sweet Potato, Cranberry Sauce, Cornbread while throwing. Cook at the Feast hub (left of safe zone).")
+	p:Section("Auto Throw Event")
 	p:Toggle("autoTgThrow", "Auto Throw Event", false, function(on)
-		if on then V.notify("Auto Throw Event", "Will pause train/throw and farm ingredients when Feast starts")
+		if on then
+			V.notify("Auto Throw Event", "Waits for Feast (~30 min). Throws only during the 5-min window, then stops.")
 		else
 			if V.tg and V.tg.active then F.tgStop() end
 			V.notify("Auto Throw Event", "Off")
@@ -2687,8 +2869,9 @@ function V.buildPages()
 			local left = math.max(0, math.floor((V.tg.endsAt or 0) - os.clock()))
 			return "ACTIVE  ·  " .. left .. "s left"
 		end
-		return F.tgDetectActive() and "Theme live" or "Waiting"
+		return F.tgDetectActive() and "Theme live" or "Waiting for next Feast"
 	end)
+	p:Info("Does NOT throw outside the event. When Feast starts: pause train, +20 power, auto throw. When it ends: restore previous mode.")
 	p:Section("Auto Cook")
 	p:Dropdown("tgSandwich", "Sandwich Size", {
 		{v = "Regular", label = "Regular  (3 ingredients)"},
@@ -2702,9 +2885,9 @@ function V.buildPages()
 	p:Button("Cook Now", "Cook", function()
 		F.tgCook(V.Flags.tgSandwich or "Regular")
 	end, 130)
-	p:Info("Regular attracts base size · Big attracts big · Mega attracts large Thanksgiving animals. Forest / Savanna / Desert do not spawn event animals.")
+	p:Info("TP to Turkey Chef / picnic table (left of safe zone) → cook selected sandwich only.")
 	p:Section("How to play")
-	p:Info("1) Throw food during the 5-minute Feast window to farm ingredients (RNG). 2) Go to the event hub left of the safe zone. 3) Press E → Thanksgiving Feast. 4) Cook Regular / Big / Mega. 5) Throw the sandwich to pull event animals (Starfall+ biomes).")
+	p:Info("Event every ~30 min · lasts 5 min. Throw to collect Sweet Potato, Cranberry Sauce, Cornbread. Cook at Feast hub. Regular/Big/Mega need 3/6/9 ingredients. Event animals spawn outside Forest/Savanna/Desert.")
 
 	-- Index
 	p = P.index
@@ -2993,6 +3176,7 @@ end
 -- START / STOP
 -- ===============================================================
 function V.cleanup()
+	V.stopThemeFx()
 	if V.alive then task.spawn(V.sendDisconnect) end   -- leave the active user count immediately
 	V.alive = false
 	pcall(function() if G.Meter then G.Meter.TestAutoTap = nil end end)
@@ -3408,6 +3592,10 @@ Off|Kapalı|Inactivo|متوقف|Désactivé|बंद|Desligado|Выкл|Aus|Non
 Only one size at a time — change the dropdown to switch.|Aynı anda yalnızca bir boyut — değiştirmek için menüyü kullan.|Solo un tamaño a la vez — cambia el desplegable.|حجم واحد فقط في كل مرة — غيّر القائمة.|Une seule taille à la fois — change le menu.|एक समय में केवल एक आकार — ड्रॉपडाउन बदलें।|Apenas um tamanho por vez — mude o menu.|Только один размер за раз — смените в списке.|Nur eine Größe gleichzeitig — Dropdown wechseln.|Hanya satu ukuran sekaligus — ganti dropdown.|一度に1サイズのみ — ドロップダウンで切替。|한 번에 하나의 크기만 — 드롭다운 변경.|Chỉ chọn một cỡ mỗi lần — đổi ở dropdown.|一次仅一种尺寸 — 用下拉切换。|Una sola misura alla volta — cambia il menu.|Tylko jeden rozmiar naraz — zmień listę.|เลือกได้ทีละขนาด — เปลี่ยนที่เมนู|Isang size lang sa isang pagkakataon — palitan sa dropdown.|Hanya satu saiz pada satu masa — tukar dropdown.
 Will TP to Feast hub and cook the selected size only|Şölen merkezine ışınlanıp yalnızca seçilen boyutu pişirir|TP al hub del Festín y cocina solo el tamaño elegido|ينتقل لمركز العيد ويطبخ الحجم المحدد فقط|TP au hub du Festin et cuisine uniquement la taille choisie|Feast हब पर TP करके केवल चुना आकार पकाएगा|TP ao hub do Festim e cozinha só o tamanho escolhido|ТП к хабу Пира и готовит только выбранный размер|TP zum Fest-Hub und kocht nur die gewählte Größe|TP ke hub Pesta dan masak hanya ukuran dipilih|フィーストハブにTPし選択サイズのみ調理|축제 허브로 TP 후 선택한 크기만 요리|TP tới hub Tiệc và chỉ nấu cỡ đã chọn|传送到盛宴中心并仅烹饪所选尺寸|TP all'hub Banchetto e cucina solo la misura scelta|TP do huba Uczty i gotuje tylko wybrany rozmiar|วาปไปฮับงานเลี้ยงแล้วทำเฉพาะขนาดที่เลือก|TP sa Feast hub at magluluto lang ng napiling size|TP ke hab Pesta dan masak saiz dipilih sahaja
 Feast hub not found|Şölen merkezi bulunamadı|Hub del Festín no encontrado|لم يُعثر على مركز العيد|Hub du Festin introuvable|Feast हब नहीं मिला|Hub do Festim não encontrado|Хаб Пира не найден|Fest-Hub nicht gefunden|Hub Pesta tidak ditemukan|フィーストハブ未検出|축제 허브를 찾을 수 없음|Không tìm thấy hub Tiệc|未找到盛宴中心|Hub Banchetto non trovato|Nie znaleziono huba Uczty|ไม่พบฮับงานเลี้ยง|Hindi nahanap ang Feast hub|Hab Pesta tidak dijumpai
+Waits for Feast (~30 min). Throws only during the 5-min window, then stops.|Şöleni bekler (~30 dk). Yalnızca 5 dk pencerede atar, sonra durur.|Espera el Festín (~30 min). Lanza solo en la ventana de 5 min y para.|ينتظر العيد (~30 د). يرمي فقط خلال 5 د ثم يتوقف.|Attend le Festin (~30 min). Lance seulement pendant 5 min puis s'arrête.|फीस्ट का इंतज़ार (~30 मिनट)। केवल 5 मिनट विंडो में थ्रो, फिर रुकता है।|Espera o Festim (~30 min). Arremessa só na janela de 5 min e para.|Ждёт Пир (~30 мин). Бросает только в 5-мин окне, затем стоп.|Wartet auf Fest (~30 Min). Wirft nur im 5-Min-Fenster, dann Stopp.|Menunggu Pesta (~30 mnt). Lempar hanya di jendela 5 mnt lalu berhenti.|フィースト待ち（約30分）。5分窓のみ投擲し停止。|축제 대기(~30분). 5분 창에서만 던지고 멈춤.|Chờ Tiệc (~30 phút). Chỉ ném trong 5 phút rồi dừng.|等待盛宴（约30分钟）。仅在5分钟窗口投掷后停止。|Attende il Banchetto (~30 min). Lancia solo nei 5 min poi ferma.|Czeka na Ucztę (~30 min). Rzuca tylko w oknie 5 min, potem stop.|รองานเลี้ยง (~30 นาที) ขว้างเฉพาะหน้าต่าง 5 นาทีแล้วหยุด|Naghihintay ng Feast (~30 min). Naghahagis lang sa 5-min window tapos titigil.|Menunggu Pesta (~30 min). Lempar hanya dalam tetingkap 5 min lalu berhenti.
+Does NOT throw outside the event. When Feast starts: pause train, +20 power, auto throw. When it ends: restore previous mode.|Etkinlik dışında ATMAZ. Şölen başlayınca: antrenmanı durdur, +20 güç, oto atış. Bitince önceki moda dön.|NO lanza fuera del evento. Al empezar el Festín: pausa train, +20 poder, auto throw. Al terminar: restaura el modo previo.|لا يرمي خارج الحدث. عند بدء العيد: إيقاف التدريب، +20 قوة، رمي تلقائي. عند الانتهاء: استعادة الوضع السابق.|Ne lance PAS hors événement. Au Festin: pause train, +20 puissance, auto throw. À la fin: mode précédent.|इवेंट के बाहर थ्रो नहीं। फीस्ट शुरू: ट्रेन रोकें, +20 पावर, ऑटो थ्रो। खत्म: पिछला मोड।|NÃO arremessa fora do evento. No Festim: pausa treino, +20 poder, auto throw. Ao fim: modo anterior.|НЕ бросает вне события. На Пире: пауза тренировки, +20 силы, авто-бросок. После: прежний режим.|Wirft NICHT außerhalb. Beim Fest: Training pausieren, +20 Power, Auto-Wurf. Danach: vorheriger Modus.|TIDAK melempar di luar event. Saat Pesta: jeda train, +20 power, auto throw. Selesai: mode sebelumnya.|イベント外では投げない。フィースト開始で訓練停止・+20パワー・自動投擲。終了で元のモード。|이벤트 밖에서는 던지지 않음. 축제 시작: 훈련 중지, +20 파워, 자동 던지기. 종료 시 이전 모드.|KHÔNG ném ngoài event. Khi Tiệc: dừng luyện, +20 sức, auto throw. Hết: khôi phục chế độ trước.|活动外不投掷。盛宴开始：暂停训练、+20力量、自动投。结束：恢复先前模式。|NON lancia fuori evento. Al Banchetto: pausa train, +20 potenza, auto throw. Fine: modalità precedente.|NIE rzuca poza eventem. Na Uczcie: pauza treningu, +20 mocy, auto rzut. Po: poprzedni tryb.|ไม่ขว้างนอกอีเวนต์ เมื่องานเลี้ยง: หยุดฝึก +20 พลัง ออโต้ขว้าง จบ: คืนโหมดก่อน|HINDI nagtatapon sa labas ng event. Sa Feast: i-pause ang train, +20 power, auto throw. Tapos: ibalik ang dating mode.|TIDAK lempar di luar acara. Bila Pesta: jeda train, +20 kuasa, auto lempar. Tamat: mode sebelumnya.
+Waiting for next Feast|Sonraki Şölen bekleniyor|Esperando el próximo Festín|انتظار العيد التالي|En attente du prochain Festin|अगले फीस्ट की प्रतीक्षा|Aguardando o próximo Festim|Ожидание следующего Пира|Warte auf nächstes Fest|Menunggu Pesta berikutnya|次のフィースト待ち|다음 축제 대기|Đang chờ Tiệc tiếp theo|等待下一场盛宴|In attesa del prossimo Banchetto|Oczekiwanie na kolejną Ucztę|รองานเลี้ยงครั้งถัดไป|Naghihintay ng susunod na Feast|Menunggu Pesta seterusnya
+TP to Turkey Chef / picnic table (left of safe zone) → cook selected sandwich only.|Turkey Chef / piknik masasına TP (güvenli alanın solu) → yalnızca seçili sandvici pişir.|TP a Turkey Chef / mesa de picnic (izq. zona segura) → cocina solo el sándwich elegido.|انتقال إلى طاهي الديك الرومي / طاولة النزهة (يسار المنطقة الآمنة) → اطبخ الساندويتش المحدد فقط.|TP vers Turkey Chef / table de pique-nique (gauche zone sûre) → cuisine uniquement le sandwich choisi.|Turkey Chef / पिकनिक टेबल पर TP (सेफ ज़ोन बाएँ) → केवल चुना सैंडविच पकाएँ।|TP ao Turkey Chef / mesa de piquenique (esq. zona segura) → cozinha só o sanduíche escolhido.|ТП к Turkey Chef / столу пикника (слева от сейф-зоны) → готовит только выбранный сэндвич.|TP zu Turkey Chef / Picknicktisch (links Safe Zone) → kocht nur gewähltes Sandwich.|TP ke Turkey Chef / meja piknik (kiri zona aman) → masak sandwich dipilih saja.|Turkey Chef／ピクニックテーブルへTP（安全地帯左）→選択サンドイッチのみ調理。|Turkey Chef / 피크닉 테이블로 TP(안전 구역 왼쪽) → 선택한 샌드위치만 요리.|TP tới Turkey Chef / bàn picnic (trái safe zone) → chỉ nấu sandwich đã chọn.|传送到Turkey Chef/野餐桌（安全区左侧）→仅烹饪所选三明治。|TP a Turkey Chef / tavolo picnic (sinistra zona sicura) → cucina solo il panino scelto.|TP do Turkey Chef / stołu piknikowego (lewo safe zone) → gotuje tylko wybraną kanapkę.|วาปไป Turkey Chef / โต๊ะปิกนิก (ซ้ายเซฟโซน) → ทำแซนด์วิชที่เลือกเท่านั้น|TP sa Turkey Chef / picnic table (kaliwa ng safe zone) → lutuin lang ang napiling sandwich.|TP ke Turkey Chef / meja picnik (kiri zon selamat) → masak sandwich dipilih sahaja.
 ]==]
 	for line in RAW:gmatch("[^\n]+") do
 		local f = {}
