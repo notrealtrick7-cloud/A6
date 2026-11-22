@@ -655,6 +655,218 @@ function F.trainLoop()
 	end
 end
 
+
+-- ===============================================================
+-- FEATURES: THANKSGIVING EVENT
+-- Event every ~30 min, lasts ~5 min. Map theme + ingredients on throws.
+-- Regular=3, Big=6, Mega=9 ingredients. Cook at feast hub left of safe zone.
+-- ===============================================================
+V.tg = { active = false, endsAt = 0, wasTrain = false, wasThrow = false, powerSnap = nil }
+
+function F.tgDetectActive()
+	-- Heuristics: thanksgiving theme parts / attributes / UI
+	local ok = false
+	local names = {"Thanksgiving", "Feast", "TurkeyChef", "Turkey Chef", "PicnicTable", "EventHub"}
+	for _, n in ipairs(names) do
+		if workspace:FindFirstChild(n, true) then ok = true break end
+	end
+	if not ok then
+		local attr = workspace:GetAttribute("ThanksgivingActive") or workspace:GetAttribute("FeastActive")
+			or workspace:GetAttribute("EventActive")
+		if attr == true then ok = true end
+	end
+	if not ok and player:GetAttribute("Thanksgiving") then ok = true end
+	-- Client state flag if game exposes one
+	if not ok and G.State then
+		local s = G.State
+		if s.Thanksgiving or s.Feast or s.EventName == "Thanksgiving" then ok = true end
+	end
+	return ok
+end
+
+function F.tgSetPowerPlus20()
+	local maxP = F.maxPower()
+	local minP = F.minPower()
+	local cur = F.effPower()
+	local want = math.clamp((cur > 0 and cur or maxP) + 20, minP, math.max(minP, maxP))
+	-- 0 means max in this game's SetThrowPower convention when at ceiling
+	local power = (want >= maxP) and 0 or want
+	local r = inv("Player_SetThrowPower", power)
+	if r.Ok then V.lastPower = power end
+	return power
+end
+
+function F.tgStart()
+	if V.tg.active then return end
+	V.tg.active = true
+	V.tg.endsAt = os.clock() + 300
+	V.tg.wasTrain = V.Flags.autoTrain == true
+	V.tg.wasThrow = V.Flags.autoThrow == true
+	V.tg.powerSnap = V.lastPower
+	-- stop training priority
+	if V.SilentSetters and V.SilentSetters.autoTrain then V.SilentSetters.autoTrain(false) end
+	if G.Training and G.Training.IsRunning and G.Training.IsRunning() then pcall(G.Training.Stop) end
+	F.tgSetPowerPlus20()
+	if V.SilentSetters and V.SilentSetters.autoThrow then
+		V.autoSkipSet = false
+		V.SilentSetters.autoThrow(true)
+		if V.SilentSetters.skipCutscene then V.SilentSetters.skipCutscene(true) end
+		if V.SilentSetters.skipCard then V.SilentSetters.skipCard(true) end
+	end
+	V.notify("Thanksgiving Event", "Auto Throw Event started (+20 power)")
+end
+
+function F.tgStop()
+	if not V.tg.active then return end
+	V.tg.active = false
+	-- restore prior farm mode
+	if V.SilentSetters and V.SilentSetters.autoThrow then
+		V.SilentSetters.autoThrow(V.tg.wasThrow == true)
+	end
+	if V.SilentSetters and V.SilentSetters.autoTrain then
+		V.SilentSetters.autoTrain(V.tg.wasTrain == true)
+	end
+	if V.tg.powerSnap ~= nil then
+		inv("Player_SetThrowPower", V.tg.powerSnap)
+		V.lastPower = V.tg.powerSnap
+	end
+	V.notify("Thanksgiving Event", "Event ended — resumed previous mode")
+end
+
+function F.tgFindFeast()
+	-- Picnic / Turkey Chef / Feast hub left of safe zone
+	local names = {
+		"Thanksgiving", "Feast", "TurkeyChef", "Turkey Chef", "PicnicTable", "Picnic Table",
+		"EventHub", "Event Hub", "FeastHub", "Feast Hub", "ThanksgivingFeast", "CookTable",
+	}
+	for _, n in ipairs(names) do
+		local o = workspace:FindFirstChild(n, true)
+		if o then
+			if o:IsA("BasePart") then return o end
+			local p = o:FindFirstChildWhichIsA("BasePart", true)
+			if p then return p end
+			local pp = o.PrimaryPart or (o:IsA("Model") and o:FindFirstChild("HumanoidRootPart"))
+			if pp then return pp end
+		end
+	end
+	-- ProximityPrompt tagged cook
+	for _, pr in ipairs(workspace:GetDescendants()) do
+		if pr:IsA("ProximityPrompt") then
+			local a = (pr.ActionText or "") .. " " .. (pr.ObjectText or "")
+			if a:lower():find("cook") or a:lower():find("feast") or a:lower():find("thanksgiving") then
+				local part = pr.Parent
+				if part and part:IsA("BasePart") then return part end
+				if part then
+					local bp = part:FindFirstChildWhichIsA("BasePart") or part.Parent and part.Parent:FindFirstChildWhichIsA("BasePart")
+					if bp then return bp end
+				end
+			end
+		end
+	end
+	return nil
+end
+
+function F.tpFeast()
+	local part = F.tgFindFeast()
+	if not part then return false end
+	return F.tpPart(part, 3)
+end
+
+function F.tgCook(size)
+	-- Only ONE size at a time (dropdown flag). TP to feast hub then cook.
+	size = size or V.Flags.tgSandwich or "Regular"
+	if size ~= "Regular" and size ~= "Big" and size ~= "Mega" then size = "Regular" end
+	if V.tgCooking then return false end
+	V.tgCooking = true
+	local okAny = false
+	local ok, err = pcall(function()
+		if not F.tpFeast() then
+			V.notify("Cook failed", "Feast hub not found")
+			return
+		end
+		task.wait(0.35)
+		-- try proximity prompt near feast
+		local part = F.tgFindFeast()
+		if part then
+			for _, pr in ipairs(part:GetDescendants()) do
+				if pr:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(pr) end) end
+			end
+			if part.Parent then
+				for _, pr in ipairs(part.Parent:GetDescendants()) do
+					if pr:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(pr) end) end
+				end
+			end
+		end
+		task.wait(0.25)
+		local remotes = {
+			"Thanksgiving_Cook", "Feast_Cook", "Event_CookSandwich", "Thanksgiving_CookSandwich",
+			"CookSandwich", "Feast_CookSandwich",
+		}
+		for _, name in ipairs(remotes) do
+			local r = inv(name, size)
+			if r.Ok then
+				okAny = true
+				V.notify("Cooked", tostring(size) .. " sandwich")
+				break
+			end
+		end
+		if not okAny and G.Remotes then
+			for _, name in ipairs({"Thanksgiving_Cook", "Feast_Cook", "CookSandwich"}) do
+				local ok2, ev = pcall(G.Remotes.Event, name)
+				if ok2 and ev then
+					pcall(function() ev:FireServer(size) end)
+					okAny = true
+					V.notify("Cooked", tostring(size) .. " sandwich")
+					break
+				end
+			end
+		end
+		if not okAny then
+			V.notify("Cook failed", "Remote not found — open Feast menu once")
+		end
+	end)
+	V.tgCooking = false
+	if not ok then warn("[A6Hub] tgCook: " .. tostring(err)) end
+	return okAny
+end
+
+function F.tgLoop()
+	local lastCheck = 0
+	while V.alive do
+		local ok, err = pcall(function()
+			if not V.Flags.autoTgThrow then
+				if V.tg.active then F.tgStop() end
+			else
+				local now = os.clock()
+				if now - lastCheck >= 2 then
+					lastCheck = now
+					local live = F.tgDetectActive()
+					if live and not V.tg.active then
+						F.tgStart()
+					elseif V.tg.active then
+						if (not live and now > (V.tg.endsAt - 240)) or now >= V.tg.endsAt then
+							F.tgStop()
+						elseif V.Flags.autoThrow ~= true then
+							-- keep throw on during event
+							if V.SilentSetters and V.SilentSetters.autoThrow then
+								V.SilentSetters.autoThrow(true)
+							end
+						end
+					end
+				end
+				if V.Flags.autoTgCook and V.tg.active and not V.tgCooking then
+					-- single selected size only (Regular / Big / Mega)
+					F.tgCook(V.Flags.tgSandwich or "Regular")
+					task.wait(3.5)
+				end
+			end
+		end)
+		if not ok then warn("[A6Hub] tg: " .. tostring(err)) end
+		task.wait(0.5)
+	end
+end
+
+
 -- ===============================================================
 -- FEATURES: SHOP
 -- ===============================================================
@@ -1356,7 +1568,7 @@ end
 local ICON_BASE = "https://a6hub.example/assets/icons/"
 local ICON_VERSION = 5   -- bump this when the hosted PNGs change so the cache is refreshed
 local ICON_NAMES = {
-	"autofarm", "throwing", "training", "index", "shop", "animals", "rewards", "teleports",
+	"autofarm", "throwing", "training", "thanksgiving", "index", "shop", "animals", "rewards", "teleports",
 	"movement", "qol", "stats", "settings", "minimize", "close", "info", "search", "people", "play", "stop", "chat", "open", "check",
 }
 V.iconAssets, V.iconWaiters = {}, {}
@@ -1408,6 +1620,39 @@ function V.fetchIcons()
 			end
 		end
 	end)
+end
+
+
+-- Maple-leaf style particle burst for Thanksgiving tab (Canada maple colors)
+function V.playMapleFX(parent)
+	if not parent then return end
+	local holder = parent:FindFirstChild("MapleFX")
+	if holder then holder:Destroy() end
+	holder = make("Frame", {Name = "MapleFX", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 5, ClipsDescendants = true}, parent)
+	local colors = {
+		Color3.fromRGB(200, 40, 40), Color3.fromRGB(220, 90, 30), Color3.fromRGB(230, 150, 40),
+		Color3.fromRGB(180, 50, 20), Color3.fromRGB(240, 180, 60), Color3.fromRGB(160, 30, 30),
+	}
+	for i = 1, 18 do
+		local leaf = make("TextLabel", {
+			BackgroundTransparency = 1, Text = "🍁", TextSize = math.random(14, 22),
+			Size = UDim2.fromOffset(24, 24),
+			Position = UDim2.new(math.random(), 0, -0.05, 0),
+			TextColor3 = colors[math.random(1, #colors)], ZIndex = 6, Rotation = math.random(-30, 30),
+		}, holder)
+		local delay = math.random() * 0.8
+		task.delay(delay, function()
+			if not leaf.Parent then return end
+			local dur = 2.2 + math.random() * 1.4
+			tween(leaf, {
+				Position = UDim2.new(leaf.Position.X.Scale + (math.random() - 0.5) * 0.25, 0, 1.05, 0),
+				Rotation = leaf.Rotation + math.random(-90, 90),
+				TextTransparency = 0.15,
+			}, dur, Enum.EasingStyle.Quad)
+			task.delay(dur + 0.05, function() if leaf.Parent then leaf:Destroy() end end)
+		end)
+	end
+	task.delay(4.5, function() if holder.Parent then holder:Destroy() end end)
 end
 
 -- ===============================================================
@@ -1700,6 +1945,7 @@ local TABS = {
 	{"autofarm", "Auto Farm", "One switch for the whole farming loop"},
 	{"throwing", "Throwing", "Target area, accuracy and auto throw"},
 	{"training", "Training", "Auto training and spot teleport"},
+	{"thanksgiving", "Auto ThanksGiving Event", "Feast throws, cook sandwiches, maple leaf FX"},
 	{"index", "Index", "Fill the missing animals in your index"},
 	{"shop", "Shop", "Food, bar and fence upgrades"},
 	{"animals", "Animals", "Equip best and rarity based selling"},
@@ -1714,6 +1960,9 @@ local TABS = {
 function V.selectTab(id)
 	V.state.tab = id
 	for tid, page in pairs(V.pages) do page.frame.Visible = (tid == id) end
+	if id == "thanksgiving" and V.pages.thanksgiving then
+		task.defer(function() V.playMapleFX(V.pages.thanksgiving.frame) end)
+	end
 	if V.search then V.search.Text = "" end
 	if V.applySearch then V.applySearch("") end
 	for tid, b in pairs(V.tabButtons) do
@@ -2266,11 +2515,14 @@ end
 
 function V.openLanguagePicker(onboarding, after)
 	local selected = V.lang
+	V.pendingLanguage = selected
 	V.modal("A6  /  " .. L("Language"), function(list, close)
 		local title = label(list, "", 22); title.Font = Enum.Font.GothamBold; title.Size = UDim2.new(1, -8, 0, 34); title.LayoutOrder = 1
 		local body = label(list, "", 12, true); body.Size = UDim2.new(1, -8, 0, 40); body.TextWrapped = true; body.TextTruncate = Enum.TextTruncate.None; body.LayoutOrder = 2
-		local grid = make("Frame", {Name = "LanguageGrid", BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 4 * 74), LayoutOrder = 3}, list)
-		make("UIGridLayout", {SortOrder = Enum.SortOrder.LayoutOrder, FillDirectionMaxCells = 3, CellSize = UDim2.new(1 / 3, -7, 0, 64), CellPadding = UDim2.fromOffset(10, 10)}, grid)
+		-- Let the language grid grow to fit every language. The modal's ScrollingFrame
+		-- then scrolls the full list, with Continue placed after the final language.
+		local grid = make("Frame", {Name = "LanguageGrid", BackgroundTransparency = 1, Size = UDim2.new(1, -8, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 3}, list)
+		local gridLayout = make("UIGridLayout", {SortOrder = Enum.SortOrder.LayoutOrder, FillDirectionMaxCells = 3, CellSize = UDim2.new(1 / 3, -7, 0, 64), CellPadding = UDim2.fromOffset(10, 10)}, grid)
 		local confirm
 		local buttons = {}
 		local function refresh()
@@ -2287,7 +2539,13 @@ function V.openLanguagePicker(onboarding, after)
 		end
 		for i, entry in ipairs(V.LanguageOptions) do
 			local code = entry[1]
-			local b = button(grid, "", function() selected = code; refresh() end, 100)
+			local b = button(grid, "", function()
+					-- Keep the pending choice on V as well as in this picker closure.
+					-- This avoids stale selection state if the modal is rebuilt/reopened.
+					selected = code
+					V.pendingLanguage = code
+					refresh()
+				end, 100)
 			b.Name = "Language_" .. code; b.LayoutOrder = i
 			local flag = label(b, entry[4], 24); flag.Position = UDim2.fromOffset(10, 16); flag.Size = UDim2.fromOffset(32, 32)
 			flag.TextXAlignment = Enum.TextXAlignment.Center; flag.TextColor3 = Color3.new(1, 1, 1)
@@ -2297,12 +2555,25 @@ function V.openLanguagePicker(onboarding, after)
 			buttons[code] = b
 		end
 		confirm = button(list, "", function()
-			close()
-			V.lang = selected
+			local chosen = V.pendingLanguage or selected or V.lang
+			if not table.find(LANG_CODES, chosen) then chosen = "EN" end
+			-- Commit before closing so the saved value and the rebuilt UI always agree.
+			V.lang = chosen
+			V.pendingLanguage = nil
 			V.saveSettings()
-			if onboarding then if after then after() end else V.rebuildUI() end
+			close()
+			-- Do not destroy/rebuild the GUI inside the Activated callback. Deferring
+			-- prevents the old modal's input handler from racing the newly built UI.
+			task.delay(0.18, function()
+				if not V.alive then return end
+				if onboarding then
+					if after then after() end
+				else
+					V.rebuildUI()
+				end
+			end)
 		end, 100)
-		confirm.Size = UDim2.new(1, -8, 0, 42); confirm.BackgroundColor3 = T.accent; confirm.TextColor3 = T.onAccent; confirm.LayoutOrder = 4
+		confirm.Size = UDim2.new(1, -8, 0, 46); confirm.BackgroundColor3 = T.accent; confirm.TextColor3 = T.onAccent; confirm.LayoutOrder = 4
 		refresh()
 	end, 720, 570, onboarding)
 end
@@ -2399,6 +2670,41 @@ function V.buildPages()
 		if not F.tpTraining() then V.notify("Training Spot not found", "") end
 	end)
 	p:Stat("Training", function() return (G.Training and G.Training.IsRunning and G.Training.IsRunning()) and "Running" or "Idle" end)
+
+	-- Thanksgiving Event
+	p = P.thanksgiving
+	p:Section("Auto ThanksGiving Event")
+	p:Info("Event every ~30 min · lasts 5 min. Collect Sweet Potato, Cranberry Sauce, Cornbread while throwing. Cook at the Feast hub (left of safe zone).")
+	p:Toggle("autoTgThrow", "Auto Throw Event", false, function(on)
+		if on then V.notify("Auto Throw Event", "Will pause train/throw and farm ingredients when Feast starts")
+		else
+			if V.tg and V.tg.active then F.tgStop() end
+			V.notify("Auto Throw Event", "Off")
+		end
+	end)
+	p:Stat("Event Status", function()
+		if V.tg and V.tg.active then
+			local left = math.max(0, math.floor((V.tg.endsAt or 0) - os.clock()))
+			return "ACTIVE  ·  " .. left .. "s left"
+		end
+		return F.tgDetectActive() and "Theme live" or "Waiting"
+	end)
+	p:Section("Auto Cook")
+	p:Dropdown("tgSandwich", "Sandwich Size", {
+		{v = "Regular", label = "Regular  (3 ingredients)"},
+		{v = "Big", label = "Big  (6 ingredients)"},
+		{v = "Mega", label = "Mega  (9 ingredients)"},
+	}, "Regular")
+	p:Info("Only one size at a time — change the dropdown to switch.")
+	p:Toggle("autoTgCook", "Auto Cook while Event", false, function(on)
+		if on then V.notify("Auto Cook", "Will TP to Feast hub and cook the selected size only") end
+	end)
+	p:Button("Cook Now", "Cook", function()
+		F.tgCook(V.Flags.tgSandwich or "Regular")
+	end, 130)
+	p:Info("Regular attracts base size · Big attracts big · Mega attracts large Thanksgiving animals. Forest / Savanna / Desert do not spawn event animals.")
+	p:Section("How to play")
+	p:Info("1) Throw food during the 5-minute Feast window to farm ingredients (RNG). 2) Go to the event hub left of the safe zone. 3) Press E → Thanksgiving Feast. 4) Cook Regular / Big / Mega. 5) Throw the sandwich to pull event animals (Starfall+ biomes).")
 
 	-- Index
 	p = P.index
@@ -2742,7 +3048,7 @@ function V.start()
 			task.wait(0.5)
 		end
 	end)
-	for _, fn in ipairs({F.throwLoop, F.superLoop, F.trainLoop, F.shopLoop, F.animalsLoop, F.rewardsLoop, F.farmLoop, F.presenceLoop}) do
+	for _, fn in ipairs({F.throwLoop, F.superLoop, F.trainLoop, F.tgLoop, F.shopLoop, F.animalsLoop, F.rewardsLoop, F.farmLoop, F.presenceLoop}) do
 		task.spawn(function()
 			setId()
 			local ok, err = pcall(fn)
@@ -3071,6 +3377,37 @@ Menu: press %s to open/close|Menü: açmak/kapatmak için %s tuşuna bas|Menú: 
 %.1fs  →  %d%%  (+%d stud)|%.1fs  →  %%%d  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d %%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)|%.1fs  →  %d%%  (+%d stud)
 Noclip|Noclip|Noclip|اختراق الجدران|Noclip|नोक्लिप|Noclip|Ноклип|Noclip|Noclip|ノークリップ|노클립|Noclip|穿墙|Noclip|Noclip|Noclip|Noclip|Noclip
 Anti AFK|Anti AFK|Anti AFK|مكافحة الخمول|Anti-AFK|एंटी AFK|Anti AFK|Анти-АФК|Anti-AFK|Anti AFK|アンチAFK|안티 AFK|Chống AFK|防挂机|Anti AFK|Anti AFK|กัน AFK|Anti AFK|Anti AFK
+Auto ThanksGiving Event|Oto Şükran Günü Etkinliği|Auto Evento Acción de Gracias|حدث الشكر التلقائي|Auto Événement Thanksgiving|ऑटो थैंक्सगिविंग इवेंट|Auto Evento de Ação de Graças|Авто День Благодарения|Auto Thanksgiving-Event|Auto Event Thanksgiving|自動サンクスギビング|자동 추수감사절 이벤트|Auto Sự kiện Lễ Tạ Ơn|自动感恩节活动|Auto Evento Thanksgiving|Auto wydarzenie Thanksgiving|ออโต้กิจกรรมขอบคุณพระเจ้า|Auto Thanksgiving Event|Auto Acara Thanksgiving
+Feast throws, cook sandwiches, maple leaf FX|Şölen atışları, sandviç pişir, akçaağaç efekti|Lanzamientos del festín, cocinar sándwiches, FX de hojas|رميات العيد وطهي الساندويتش وتأثير أوراق القيقب|Lancers du festin, cuisiner des sandwichs, FX feuilles|फीस्ट थ्रो, सैंडविच पकाएँ, मेपल लीफ FX|Arremessos do festim, cozinhar sanduíches, FX de folhas|Броски пира, готовка сэндвичей, эффект кленовых листьев|Festmahl-Würfe, Sandwiches kochen, Ahornblatt-FX|Lemparan pesta, masak sandwich, FX daun maple|フィースト投擲・サンドイッチ調理・カエデFX|축제 던지기, 샌드위치 요리, 단풍 FX|Ném tiệc, nấu sandwich, hiệu ứng lá phong|盛宴投掷、烹饪三明治、枫叶特效|Lanci del banchetto, cucina panini, FX foglie d'acero|Rzuty uczty, gotowanie kanapek, FX liści klonu|ขว้างงานเลี้ยง ทำแซนด์วิช เอฟเฟกต์ใบเมเปิล|Feast throws, magluto ng sandwich, maple leaf FX|Lemparan pesta, masak sandwich, FX daun maple
+Event every ~30 min · lasts 5 min. Collect Sweet Potato, Cranberry Sauce, Cornbread while throwing. Cook at the Feast hub (left of safe zone).|~30 dk'da bir, 5 dk sürer. Atarken Tatlı Patates, Kızılcık Sosu, Mısır Ekmeği topla. Güvenli alanın solundaki Şölen merkezinde pişir.|Cada ~30 min, dura 5 min. Recoge Batata, Salsa de arándano y Pan de maíz al lanzar. Cocina en el hub del Festín (izquierda de la zona segura).|كل ~30 دقيقة لمدة 5 دقائق. اجمع البطاطا الحلوة وصلصة التوت وخبز الذرة أثناء الرمي. اطبخ في مركز العيد يسار المنطقة الآمنة.|Toutes les ~30 min, dure 5 min. Collecte Patate douce, Sauce aux canneberges, Pain de maïs en lançant. Cuisine au hub du Festin (gauche de la zone sûre).|~30 मिनट पर, 5 मिनट। फेंकते समय स्वीट पोटैटो, क्रैनबेरी सॉस, कॉर्नब्रेड इकट्ठा करें। सेफ ज़ोन के बाएँ Feast हब पर पकाएँ।|A cada ~30 min, dura 5 min. Colete Batata-doce, Molho de cranberry e Pão de milho ao arremessar. Cozinhe no hub do Festim (esquerda da zona segura).|Каждые ~30 мин, 5 мин. Собирайте батат, клюквенный соус и кукурузный хлеб при бросках. Готовьте в центре Пира слева от безопасной зоны.|Alle ~30 Min., 5 Min. lang. Sammle Süßkartoffel, Preiselbeersauce, Maisbrot beim Werfen. Koche am Fest-Hub (links der Safe Zone).|Setiap ~30 mnt, 5 mnt. Kumpulkan Ubi manis, Saus cranberry, Roti jagung saat melempar. Masak di hub Pesta (kiri zona aman).|約30分ごと・5分間。投げながらスイートポテト・クランベリーソース・コーンブレッドを集める。安全地帯左のフィーストハブで調理。|약 30분마다 5분. 던지며 고구마, 크랜베리 소스, 콘브레드 수집. 안전 구역 왼쪽 축제 허브에서 요리.|Mỗi ~30 phút, kéo dài 5 phút. Ném để lấy Khoai ngọt, Sốt nam việt quất, Bánh bắp. Nấu tại hub Tiệc (trái safe zone).|约每30分钟一次，持续5分钟。投掷时收集红薯、蔓越莓酱、玉米面包。在安全区左侧盛宴中心烹饪。|Ogni ~30 min, dura 5 min. Raccogli Patata dolce, Salsa di mirtilli, Pane di mais lanciando. Cucina all'hub del Banchetto (sinistra zona sicura).|Co ~30 min, trwa 5 min. Zbieraj Bataty, Sos żurawinowy, Chleb kukurydziany rzucając. Gotuj w hubie Uczty (lewo safe zone).|ทุก ~30 นาที นาน 5 นาที เก็บมันหวาน ซอสแครนเบอร์รี ขนมปังข้าวโพดตอนขว้าง ทำอาหารที่ฮับงานเลี้ยง (ซ้ายเซฟโซน)|Bawat ~30 min, 5 min. Mangolekta ng Sweet Potato, Cranberry Sauce, Cornbread habang naghahagis. Magluto sa Feast hub (kaliwa ng safe zone).|Setiap ~30 min, 5 min. Kumpul Ubi keledek, Sos kranberi, Roti jagung semasa lempar. Masak di hab Pesta (kiri zon selamat).
+Auto Throw Event|Oto Etkinlik Atışı|Auto Lanzamiento de Evento|رمي الحدث التلقائي|Auto Lancer d'événement|ऑटो इवेंट थ्रो|Auto Arremesso de Evento|Авто бросок события|Auto Event-Wurf|Auto Lempar Event|自動イベント投擲|자동 이벤트 던지기|Tự động ném sự kiện|自动活动投掷|Auto Lancio Evento|Auto rzut wydarzenia|ออโต้ขว้างอีเวนต์|Auto Throw Event|Auto Lempar Acara
+Will pause train/throw and farm ingredients when Feast starts|Şölen başlayınca antrenman/atışı durdurup malzeme farmlar|Al empezar el Festín pausa train/throw y farmea ingredientes|عند بدء العيد يوقف التدريب/الرمي ويزرع المكونات|Au début du Festin, pause train/throw et farm d'ingrédients|फीस्ट शुरू होने पर ट्रेन/थ्रो रोककर सामग्री फार्म करेगा|Ao iniciar o Festim, pausa treino/arremesso e farma ingredientes|При старте Пира остановит тренировку/броски и фармит ингредиенты|Beim Fest-Start: Training/Wurf pausieren und Zutaten farmen|Saat Pesta mulai, jeda train/throw dan farm bahan|フィースト開始時に訓練/投擲を止め材料を集める|축제 시작 시 훈련/던지기를 멈추고 재료 파밍|Khi Tiệc bắt đầu sẽ dừng luyện/ném và farm nguyên liệu|盛宴开始时暂停训练/投掷并刷材料|All'inizio del Banchetto mette in pausa train/throw e farma ingredienti|Na start Uczty pauzuje trening/rzut i farmi składniki|เมื่องานเลี้ยงเริ่ม จะหยุดฝึก/ขว้างและฟาร์มวัตถุดิบ|Kapag nagsimula ang Feast, i-pause ang train/throw at magfa-farm ng ingredients|Bila Pesta mula, jeda train/throw dan farm bahan
+Event Status|Etkinlik Durumu|Estado del evento|حالة الحدث|État de l'événement|इवेंट स्थिति|Status do evento|Статус события|Event-Status|Status Event|イベント状態|이벤트 상태|Trạng thái sự kiện|活动状态|Stato evento|Status wydarzenia|สถานะอีเวนต์|Status ng Event|Status Acara
+ACTIVE  ·  |AKTİF  ·  |ACTIVO  ·  |نشط  ·  |ACTIF  ·  |सक्रिय  ·  |ATIVO  ·  |АКТИВНО  ·  |AKTIV  ·  |AKTIF  ·  |進行中  ·  |진행 중  ·  |ĐANG DIỄN RA  ·  |进行中  ·  |ATTIVO  ·  |AKTYWNE  ·  |กำลังดำเนิน  ·  |AKTIBO  ·  |AKTIF  ·  
+s left|sn kaldı|s restantes|ث متبقية|s restantes|से बचे|s restantes|с осталось|s übrig|d tersisa|秒残り|초 남음|s còn lại|秒剩余|s rimasti|s pozostało|วิที่เหลือ|s natitira|s tinggal
+Theme live|Tema canlı|Tema en vivo|السمة مباشرة|Thème en direct|थीम लाइव|Tema ao vivo|Тема активна|Theme live|Tema aktif|テーマ発動中|테마 진행|Theme đang chạy|主题进行中|Tema attivo|Motyw aktywny|ธีมสด|Theme live|Tema langsung
+Waiting|Bekleniyor|Esperando|انتظار|En attente|प्रतीक्षा|Aguardando|Ожидание|Warten|Menunggu|待機中|대기 중|Đang chờ|等待中|In attesa|Oczekiwanie|กำลังรอ|Naghihintay|Menunggu
+Auto Cook|Oto Pişir|Auto Cocinar|طهي تلقائي|Auto Cuisson|ऑटो कुक|Auto Cozinhar|Авто готовка|Auto Kochen|Auto Masak|自動調理|자동 요리|Tự nấu|自动烹饪|Auto Cucina|Auto gotowanie|ออโต้ทำอาหาร|Auto Cook|Auto Masak
+Sandwich Size|Sandviç Boyutu|Tamaño del sándwich|حجم الساندويتش|Taille du sandwich|सैंडविच आकार|Tamanho do sanduíche|Размер сэндвича|Sandwich-Größe|Ukuran Sandwich|サンドイッチサイズ|샌드위치 크기|Cỡ sandwich|三明治尺寸|Dimensione panino|Rozmiar kanapki|ขนาดแซนด์วิช|Laki ng Sandwich|Saiz sandwich
+Regular  (3 ingredients)|Normal  (3 malzeme)|Normal  (3 ingredientes)|عادي  (3 مكونات)|Normal  (3 ingrédients)|रेगुलर  (3 सामग्री)|Normal  (3 ingredientes)|Обычный  (3 ингредиента)|Normal  (3 Zutaten)|Regular  (3 bahan)|レギュラー  (材料3)|레귤러  (재료 3)|Thường  (3 nguyên liệu)|普通  (3材料)|Normale  (3 ingredienti)|Zwykła  (3 składniki)|ธรรมดา  (3 วัตถุดิบ)|Regular  (3 ingredients)|Biasa  (3 bahan)
+Big  (6 ingredients)|Büyük  (6 malzeme)|Grande  (6 ingredientes)|كبير  (6 مكونات)|Grand  (6 ingrédients)|बिग  (6 सामग्री)|Grande  (6 ingredientes)|Большой  (6 ингредиентов)|Groß  (6 Zutaten)|Big  (6 bahan)|ビッグ  (材料6)|빅  (재료 6)|Lớn  (6 nguyên liệu)|大  (6材料)|Grande  (6 ingredienti)|Duża  (6 składników)|ใหญ่  (6 วัตถุดิบ)|Big  (6 ingredients)|Besar  (6 bahan)
+Mega  (9 ingredients)|Mega  (9 malzeme)|Mega  (9 ingredientes)|ميجا  (9 مكونات)|Méga  (9 ingrédients)|मेगा  (9 सामग्री)|Mega  (9 ingredientes)|Мега  (9 ингредиентов)|Mega  (9 Zutaten)|Mega  (9 bahan)|メガ  (材料9)|메가  (재료 9)|Siêu  (9 nguyên liệu)|巨型  (9材料)|Mega  (9 ingredienti)|Mega  (9 składników)|เมกะ  (9 วัตถุดิบ)|Mega  (9 ingredients)|Mega  (9 bahan)
+Auto Cook while Event|Etkinlikte Oto Pişir|Auto cocinar durante el evento|طهي تلقائي أثناء الحدث|Auto cuisson pendant l'événement|इवेंट के दौरान ऑटो कुक|Auto cozinhar durante o evento|Авто готовка во время события|Auto kochen während Event|Auto masak saat Event|イベント中に自動調理|이벤트 중 자동 요리|Tự nấu khi sự kiện|活动期间自动烹饪|Auto cucina durante evento|Auto gotuj podczas wydarzenia|ออโต้ทำอาหารระหว่างอีเวนต์|Auto Cook habang Event|Auto masak semasa Acara
+Cook Now|Şimdi Pişir|Cocinar ahora|اطبخ الآن|Cuisiner maintenant|अभी पकाएँ|Cozinhar agora|Приготовить сейчас|Jetzt kochen|Masak Sekarang|今すぐ調理|지금 요리|Nấu ngay|立即烹饪|Cucina ora|Gotuj teraz|ทำอาหารตอนนี้|Magluto Ngayon|Masak sekarang
+Cook|Pişir|Cocinar|طهي|Cuisiner|पकाएँ|Cozinhar|Готовить|Kochen|Masak|調理|요리|Nấu|烹饪|Cucina|Gotuj|ทำอาหาร|Magluto|Masak
+Cooked|Pişirildi|Cocinado|تم الطهي|Cuit|पकाया गया|Cozinhado|Приготовлено|Gekocht|Dimasak|調理完了|요리됨|Đã nấu|已烹饪|Cotto|Ugotowano|ทำแล้ว|Naluto|Dimasak
+Cook failed|Pişirme başarısız|Cocción fallida|فشل الطهي|Cuisson échouée|पकाना विफल|Falha ao cozinhar|Готовка не удалась|Kochen fehlgeschlagen|Gagal masak|調理失敗|요리 실패|Nấu thất bại|烹饪失败|Cottura fallita|Gotowanie nieudane|ทำอาหารล้มเหลว|Nabigo ang pagluto|Gagal masak
+Remote not found — open Feast menu once|Remote bulunamadı — Şölen menüsünü bir kez aç|Remote no encontrado — abre el menú del Festín una vez|لم يُعثر على الريموت — افتح قائمة العيد مرة|Remote introuvable — ouvre le menu du Festin une fois|रिमोट नहीं मिला — Feast मेनू एक बार खोलें|Remote não encontrado — abra o menu do Festim uma vez|Remote не найден — откройте меню Пира один раз|Remote nicht gefunden — öffne Fest-Menü einmal|Remote tidak ditemukan — buka menu Pesta sekali|Remote未検出 — フィーストメニューを一度開く|리모트 없음 — 축제 메뉴를 한 번 여세요|Không thấy remote — mở menu Tiệc một lần|未找到远程 — 请先打开一次盛宴菜单|Remote non trovato — apri il menu Banchetto una volta|Nie znaleziono remote — otwórz menu Uczty raz|ไม่พบรีโมต — เปิดเมนูงานเลี้ยงสักครั้ง|Hindi nahanap ang remote — buksan ang Feast menu isang beses|Remote tidak dijumpai — buka menu Pesta sekali
+Regular attracts base size · Big attracts big · Mega attracts large Thanksgiving animals. Forest / Savanna / Desert do not spawn event animals.|Normal temel boyut, Büyük büyük, Mega büyük Şükran hayvanlarını çeker. Orman/Savana/Çöl event hayvanı doğurmaz.|Normal atrae tamaño base · Grande atrae grandes · Mega atrae grandes de Acción de Gracias. Bosque/Sabana/Desierto no generan animales de evento.|العادي يجذب الحجم الأساسي · الكبير يجذب الكبير · الميجا يجذب حيوانات الشكر الكبيرة. الغابة/السافانا/الصحراء لا تظهر حيوانات الحدث.|Normal attire taille de base · Grand attire grands · Méga attire grands animaux Thanksgiving. Forêt/Savane/Désert ne spawn pas d'animaux d'événement.|रेगुलर बेस साइज़ · बिग बड़े · मेगा बड़े थैंक्सगिविंग जानवर खींचता है। जंगल/सवाना/रेगिस्तान में इवेंट जानवर नहीं।|Normal atrai tamanho base · Grande atrai grandes · Mega atrai animais grandes de Ação de Graças. Floresta/Savana/Deserto não geram animais de evento.|Обычный — базовый размер · Большой — крупных · Мега — крупных животных Дня благодарения. Лес/Саванна/Пустыня не спавнят ивент-животных.|Normal zieht Basisgröße · Groß zieht große · Mega zieht große Thanksgiving-Tiere. Wald/Savanne/Wüste spawnen keine Event-Tiere.|Regular tarik ukuran dasar · Big tarik besar · Mega tarik hewan Thanksgiving besar. Hutan/Savana/Gurun tidak spawn hewan event.|レギュラーは基本サイズ・ビッグは大型・メガは大型サンクスギビング動物を誘引。森/サバンナ/砂漠はイベント動物を出さない。|레귤러는 기본 크기 · 빅은 큰 것 · 메가는 큰 추수감사절 동물을 유인. 숲/사바나/사막은 이벤트 동물 스폰 안 함.|Thường hút size gốc · Lớn hút size lớn · Siêu hút thú Tạ Ơn lớn. Rừng / Savanna / Sa mạc không spawn thú event.|普通吸引基础体型 · 大吸引大型 · 巨型吸引大型感恩节动物。森林/草原/沙漠不刷活动动物。|Normale attira taglia base · Grande attira grandi · Mega attira grandi animali Thanksgiving. Foresta/Savana/Deserto non spawnano animali evento.|Zwykła przyciąga bazowy rozmiar · Duża duże · Mega duże zwierzęta Thanksgiving. Las/Sawanna/Pustynia nie spawnują zwierząt eventu.|ธรรมดาดึงขนาดพื้นฐาน · ใหญดึงตัวใหญ่ · เมกะดึงสัตว์ขอบคุณพระเจ้าขนาดใหญ่ ป่า/สะวันนา/ทะเลทรายไม่เกิดสัตว์อีเวนต์|Regular umaakit ng base size · Big sa malalaki · Mega sa malalaking Thanksgiving animals. Forest / Savanna / Desert hindi nag-s-spawn ng event animals.|Biasa tarik saiz asas · Besar tarik besar · Mega tarik haiwan Thanksgiving besar. Hutan/Savana/Gurun tidak spawn haiwan acara.
+How to play|Nasıl oynanır|Cómo jugar|طريقة اللعب|Comment jouer|कैसे खेलें|Como jogar|Как играть|So spielt man|Cara main|遊び方|플레이 방법|Cách chơi|玩法|Come si gioca|Jak grać|วิธีเล่น|Paano maglaro|Cara main
+1) Throw food during the 5-minute Feast window to farm ingredients (RNG). 2) Go to the event hub left of the safe zone. 3) Press E → Thanksgiving Feast. 4) Cook Regular / Big / Mega. 5) Throw the sandwich to pull event animals (Starfall+ biomes).|1) 5 dk'lık Şölen penceresinde malzeme farmlamak için yiyecek at (RNG). 2) Güvenli alanın solundaki etkinlik merkezine git. 3) E → Şükran Günü Şöleni. 4) Normal / Büyük / Mega pişir. 5) Sandvici atarak etkinlik hayvanlarını çek (Starfall+ biyomlar).|1) Lanza comida en la ventana de 5 min del Festín para farmear ingredientes (RNG). 2) Ve al hub del evento a la izquierda de la zona segura. 3) E → Festín de Acción de Gracias. 4) Cocina Normal / Grande / Mega. 5) Lanza el sándwich para atraer animales de evento (biomas Starfall+).|1) ارْمِ الطعام خلال نافذة العيد 5 دقائق لجمع المكونات (عشوائي). 2) اذهب لمركز الحدث يسار المنطقة الآمنة. 3) E → وليمة الشكر. 4) اطبخ عادي / كبير / ميجا. 5) ارمِ الساندويتش لجذب حيوانات الحدث (مناطق Starfall+).|1) Lance de la nourriture pendant les 5 min du Festin pour farmer les ingrédients (RNG). 2) Va au hub d'événement à gauche de la zone sûre. 3) E → Festin Thanksgiving. 4) Cuisine Normal / Grand / Méga. 5) Lance le sandwich pour attirer les animaux d'événement (biomes Starfall+).|1) 5 मिनट की फीस्ट विंडो में सामग्री फार्म करने के लिए खाना फेंको (RNG)। 2) सेफ ज़ोन के बाएँ इवेंट हब पर जाओ। 3) E → थैंक्सगिविंग फीस्ट। 4) रेगुलर / बिग / मेगा पकाओ। 5) सैंडविच फेंककर इवेंट जानवर खींचो (Starfall+ बायोम)।|1) Arremesse comida na janela de 5 min do Festim para farmear ingredientes (RNG). 2) Vá ao hub do evento à esquerda da zona segura. 3) E → Festim de Ação de Graças. 4) Cozinhe Normal / Grande / Mega. 5) Arremesse o sanduíche para atrair animais de evento (biomas Starfall+).|1) Бросайте еду в 5-минутное окно Пира, чтобы фармить ингредиенты (RNG). 2) Идите в хаб события слева от безопасной зоны. 3) E → Пир Дня благодарения. 4) Готовьте Обычный / Большой / Мега. 5) Бросайте сэндвич, чтобы привлечь ивент-животных (биомы Starfall+).|1) Wirf Essen im 5-Minuten-Festfenster, um Zutaten zu farmen (RNG). 2) Geh zum Event-Hub links der Safe Zone. 3) E → Thanksgiving-Fest. 4) Koche Normal / Groß / Mega. 5) Wirf das Sandwich, um Event-Tiere anzulocken (Starfall+-Biome).|1) Lempar makanan selama jendela Pesta 5 menit untuk farm bahan (RNG). 2) Pergi ke hub event di kiri zona aman. 3) E → Pesta Thanksgiving. 4) Masak Regular / Big / Mega. 5) Lempar sandwich untuk tarik hewan event (biome Starfall+).|1) 5分間のフィースト中に食べ物を投げて材料を集める（RNG）。2) 安全地帯左のイベントハブへ。3) E → サンクスギビングフィースト。4) レギュラー/ビッグ/メガを調理。5) サンドイッチを投げてイベント動物を誘引（Starfall+バイオーム）。|1) 5분 축제 동안 음식을 던져 재료 파밍(RNG). 2) 안전 구역 왼쪽 이벤트 허브로. 3) E → 추수감사절 축제. 4) 레귤러/빅/메가 요리. 5) 샌드위치를 던져 이벤트 동물 유인(Starfall+ 바이옴).|1) Ném thức ăn trong 5 phút Tiệc để farm nguyên liệu (RNG). 2) Đến hub sự kiện bên trái safe zone. 3) E → Tiệc Tạ Ơn. 4) Nấu Thường / Lớn / Siêu. 5) Ném sandwich để hút thú event (biome Starfall+).|1) 在5分钟盛宴窗口投掷食物刷材料（随机）。2) 前往安全区左侧活动中心。3) E → 感恩节盛宴。4) 烹饪普通/大/巨型。5) 投掷三明治吸引活动动物（Starfall+生态区）。|1) Lancia cibo nella finestra di 5 min del Banchetto per farmare ingredienti (RNG). 2) Vai all'hub evento a sinistra della zona sicura. 3) E → Banchetto Thanksgiving. 4) Cucina Normale / Grande / Mega. 5) Lancia il panino per attirare animali evento (biomi Starfall+).|1) Rzucaj jedzenie w 5-minutowym oknie Uczty, by farmić składniki (RNG). 2) Idź do huba wydarzenia na lewo od safe zone. 3) E → Uczta Thanksgiving. 4) Gotuj Zwykłą / Dużą / Mega. 5) Rzuć kanapkę, by przyciągnąć zwierzęta eventu (biomy Starfall+).|1) ขว้างอาหารในช่วง 5 นาทีของงานเลี้ยงเพื่อฟาร์มวัตถุดิบ (RNG) 2) ไปฮับอีเวนต์ซ้ายเซฟโซน 3) E → งานเลี้ยงขอบคุณพระเจ้า 4) ทำ ธรรมดา / ใหญ่ / เมกะ 5) ขว้างแซนด์วิชเพื่อดึงสัตว์อีเวนต์ (ไบโอม Starfall+)|1) Maghagis ng pagkain sa 5-minutong Feast window para mag-farm ng ingredients (RNG). 2) Pumunta sa event hub sa kaliwa ng safe zone. 3) E → Thanksgiving Feast. 4) Magluto ng Regular / Big / Mega. 5) Ihagis ang sandwich para humila ng event animals (Starfall+ biomes).|1) Lempar makanan semasa tetingkap Pesta 5 min untuk farm bahan (RNG). 2) Pergi ke hab acara di kiri zon selamat. 3) E → Pesta Thanksgiving. 4) Masak Biasa / Besar / Mega. 5) Lempar sandwich untuk tarik haiwan acara (biome Starfall+).
+Thanksgiving Event|Şükran Günü Etkinliği|Evento de Acción de Gracias|حدث الشكر|Événement Thanksgiving|थैंक्सगिविंग इवेंट|Evento de Ação de Graças|Событие Дня благодарения|Thanksgiving-Event|Event Thanksgiving|サンクスギビングイベント|추수감사절 이벤트|Sự kiện Lễ Tạ Ơn|感恩节活动|Evento Thanksgiving|Wydarzenie Thanksgiving|อีเวนต์ขอบคุณพระเจ้า|Thanksgiving Event|Acara Thanksgiving
+Auto Throw Event started (+20 power)|Oto Etkinlik Atışı başladı (+20 güç)|Auto Lanzamiento de Evento iniciado (+20 poder)|بدأ رمي الحدث التلقائي (+20 قوة)|Auto Lancer d'événement démarré (+20 puissance)|ऑटो इवेंट थ्रो शुरू (+20 पावर)|Auto Arremesso de Evento iniciado (+20 poder)|Авто бросок события начат (+20 силы)|Auto Event-Wurf gestartet (+20 Power)|Auto Lempar Event dimulai (+20 power)|自動イベント投擲開始（+20パワー）|자동 이벤트 던지기 시작 (+20 파워)|Tự ném sự kiện bắt đầu (+20 sức)|自动活动投掷已开始（+20力量）|Auto Lancio Evento avviato (+20 potenza)|Auto rzut wydarzenia rozpoczęty (+20 mocy)|เริ่มออโต้ขว้างอีเวนต์ (+20 พลัง)|Nagsimula ang Auto Throw Event (+20 power)|Auto Lempar Acara dimulakan (+20 kuasa)
+Event ended — resumed previous mode|Etkinlik bitti — önceki moda dönüldü|Evento terminado — se reanudó el modo anterior|انتهى الحدث — استُؤنف الوضع السابق|Événement terminé — mode précédent repris|इवेंट समाप्त — पिछला मोड फिर से|Evento encerrado — modo anterior retomado|Событие закончилось — прежний режим возобновлён|Event beendet — vorheriger Modus fortgesetzt|Event selesai — mode sebelumnya dilanjutkan|イベント終了 — 前のモードに復帰|이벤트 종료 — 이전 모드 재개|Hết sự kiện — đã quay lại chế độ trước|活动结束 — 已恢复先前模式|Evento terminato — ripreso modalità precedente|Wydarzenie zakończone — wznowiono poprzedni tryb|อีเวนต์จบ — กลับโหมดก่อนหน้า|Tapos na ang event — ibinalik ang dating mode|Acara tamat — mode sebelumnya disambung
+Off|Kapalı|Inactivo|متوقف|Désactivé|बंद|Desligado|Выкл|Aus|Nonaktif|オフ|꺼짐|Tắt|关|Disattivo|Wył.|ปิด|Naka-off|Mati
+Only one size at a time — change the dropdown to switch.|Aynı anda yalnızca bir boyut — değiştirmek için menüyü kullan.|Solo un tamaño a la vez — cambia el desplegable.|حجم واحد فقط في كل مرة — غيّر القائمة.|Une seule taille à la fois — change le menu.|एक समय में केवल एक आकार — ड्रॉपडाउन बदलें।|Apenas um tamanho por vez — mude o menu.|Только один размер за раз — смените в списке.|Nur eine Größe gleichzeitig — Dropdown wechseln.|Hanya satu ukuran sekaligus — ganti dropdown.|一度に1サイズのみ — ドロップダウンで切替。|한 번에 하나의 크기만 — 드롭다운 변경.|Chỉ chọn một cỡ mỗi lần — đổi ở dropdown.|一次仅一种尺寸 — 用下拉切换。|Una sola misura alla volta — cambia il menu.|Tylko jeden rozmiar naraz — zmień listę.|เลือกได้ทีละขนาด — เปลี่ยนที่เมนู|Isang size lang sa isang pagkakataon — palitan sa dropdown.|Hanya satu saiz pada satu masa — tukar dropdown.
+Will TP to Feast hub and cook the selected size only|Şölen merkezine ışınlanıp yalnızca seçilen boyutu pişirir|TP al hub del Festín y cocina solo el tamaño elegido|ينتقل لمركز العيد ويطبخ الحجم المحدد فقط|TP au hub du Festin et cuisine uniquement la taille choisie|Feast हब पर TP करके केवल चुना आकार पकाएगा|TP ao hub do Festim e cozinha só o tamanho escolhido|ТП к хабу Пира и готовит только выбранный размер|TP zum Fest-Hub und kocht nur die gewählte Größe|TP ke hub Pesta dan masak hanya ukuran dipilih|フィーストハブにTPし選択サイズのみ調理|축제 허브로 TP 후 선택한 크기만 요리|TP tới hub Tiệc và chỉ nấu cỡ đã chọn|传送到盛宴中心并仅烹饪所选尺寸|TP all'hub Banchetto e cucina solo la misura scelta|TP do huba Uczty i gotuje tylko wybrany rozmiar|วาปไปฮับงานเลี้ยงแล้วทำเฉพาะขนาดที่เลือก|TP sa Feast hub at magluluto lang ng napiling size|TP ke hab Pesta dan masak saiz dipilih sahaja
+Feast hub not found|Şölen merkezi bulunamadı|Hub del Festín no encontrado|لم يُعثر على مركز العيد|Hub du Festin introuvable|Feast हब नहीं मिला|Hub do Festim não encontrado|Хаб Пира не найден|Fest-Hub nicht gefunden|Hub Pesta tidak ditemukan|フィーストハブ未検出|축제 허브를 찾을 수 없음|Không tìm thấy hub Tiệc|未找到盛宴中心|Hub Banchetto non trovato|Nie znaleziono huba Uczty|ไม่พบฮับงานเลี้ยง|Hindi nahanap ang Feast hub|Hab Pesta tidak dijumpai
 ]==]
 	for line in RAW:gmatch("[^\n]+") do
 		local f = {}
